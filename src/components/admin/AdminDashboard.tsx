@@ -25,8 +25,10 @@ import {
   EyeOff,
   Bot,
   Key,
+  Printer,
 } from 'lucide-react';
-import type { MenuItem, AdminSubTab, RestaurantSettings, CardGatewayType } from '../../types/pos';
+import type { MenuItem, AdminSubTab, RestaurantSettings, CardGatewayType, SinglePrintLayoutConfig } from '../../types/pos';
+import { initialSettings } from '../../data/initialData';
 import { BillLogs } from './BillLogs';
 import { FinancingPanel } from './FinancingPanel';
 import { EmployeePanel } from './EmployeePanel';
@@ -1798,6 +1800,243 @@ export const AdminDashboard: React.FC = () => {
                   </div>
                 </div>
               )}
+
+              {/* Section 4: Thermal Print Layout Settings (ตั้งค่ารูปแบบการพิมพ์สลิปและใบเสร็จ) */}
+              <div
+                style={{
+                  background: 'var(--color-bg-card)',
+                  border: '1px solid var(--color-border)',
+                  borderRadius: 'var(--radius-lg)',
+                  padding: 24,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 22,
+                  marginTop: 10,
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, borderBottom: '1px solid var(--color-border)', paddingBottom: 14 }}>
+                  <div
+                    style={{
+                      width: 36,
+                      height: 36,
+                      borderRadius: 8,
+                      background: 'rgba(245, 158, 11, 0.15)',
+                      color: 'var(--color-primary)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <Printer size={20} />
+                  </div>
+                  <div>
+                    <h3 style={{ fontSize: 17, fontWeight: 800, color: '#fff', margin: 0 }}>
+                      {language === 'th' ? 'ตั้งค่าการพิมพ์และสลิปความร้อน (Thermal Print Layout Settings)' : 'Thermal Print Layout Settings'}
+                    </h3>
+                    <p style={{ fontSize: 12, color: 'var(--color-text-secondary)', margin: '2px 0 0' }}>
+                      {language === 'th'
+                        ? 'กำหนดขนาดกระดาษ (80mm / 58mm), หัวกระดาษ, ข้อความลงท้าย, และส่วนประกอบของสลิปแยกอิสระตามประเภทเอกสาร'
+                        : 'Customize paper width, headers, footnotes, and layout elements for each print document type'}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Print Layout Grid for each Document Type */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+                  {[
+                    {
+                      key: 'qrSlip' as const,
+                      titleTh: '1. สลิป QR Code สั่งอาหาร (Order QR Slip)',
+                      titleEn: '1. Customer Order QR Slip',
+                      descTh: 'สลิปพิมพ์ QR Code เพื่อให้ลูกค้าสแกนสั่งอาหารจากมือถือที่โต๊ะ',
+                      descEn: 'Thermal slip with QR code printed for customer self-ordering at table',
+                      icon: <QrCode size={18} style={{ color: '#f59e0b' }} />,
+                    },
+                    {
+                      key: 'customerReceipt' as const,
+                      titleTh: '2. ใบเสร็จรับเงิน / ใบเรียกเก็บเงิน (Customer Receipt & Bill)',
+                      titleEn: '2. Customer Receipt & Bill',
+                      descTh: 'ใบแจ้งยอดชำระและใบเสร็จรับเงินอย่างย่อสำหรับมอบให้ลูกค้า',
+                      descEn: 'Thermal bill receipt given to customer upon checkout',
+                      icon: <Receipt size={18} style={{ color: '#10b981' }} />,
+                    },
+                    {
+                      key: 'kitchenTicket' as const,
+                      titleTh: '3. ใบสั่งอาหารเข้าครัว (Kitchen KDS Ticket)',
+                      titleEn: '3. Kitchen KDS Ticket',
+                      descTh: 'สลิปรายการอาหารสำหรับส่งต่อให้เชฟและห้องครัว',
+                      descEn: 'Thermal order ticket printed for kitchen & bar staff',
+                      icon: <Utensils size={18} style={{ color: '#ef4444' }} />,
+                    },
+                    {
+                      key: 'shiftSummary' as const,
+                      titleTh: '4. ใบสรุปรายงานปิดกะ (Shift Summary Slip)',
+                      titleEn: '4. Shift Summary Slip',
+                      descTh: 'รายงานสรุปยอดขาย ลิ้นชักเงิน และส่วนต่างเมื่อปิดกะพนักงาน',
+                      descEn: 'Shift closing report slip printed at shift end',
+                      icon: <Clock size={18} style={{ color: '#60a5fa' }} />,
+                    },
+                  ].map((docType) => {
+                    const defaultLayout = initialSettings.printLayouts![docType.key];
+                    const currentLayout: SinglePrintLayoutConfig = {
+                      ...defaultLayout,
+                      ...(settingsForm.printLayouts?.[docType.key] || {}),
+                    };
+
+                    const updateLayout = (updates: Partial<SinglePrintLayoutConfig>) => {
+                      setSettingsForm({
+                        ...settingsForm,
+                        printLayouts: {
+                          ...(settingsForm.printLayouts || initialSettings.printLayouts!),
+                          [docType.key]: {
+                            ...currentLayout,
+                            ...updates,
+                          },
+                        },
+                      });
+                    };
+
+                    return (
+                      <div
+                        key={docType.key}
+                        style={{
+                          background: 'var(--color-bg-elevated)',
+                          border: '1px solid var(--color-border)',
+                          borderRadius: 12,
+                          padding: 16,
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: 14,
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--color-border)', paddingBottom: 10, flexWrap: 'wrap', gap: 10 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                            <div style={{ padding: 6, borderRadius: 6, background: 'rgba(255,255,255,0.05)' }}>
+                              {docType.icon}
+                            </div>
+                            <div>
+                              <div style={{ fontSize: 14, fontWeight: 800, color: '#fff' }}>
+                                {language === 'th' ? docType.titleTh : docType.titleEn}
+                              </div>
+                              <div style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>
+                                {language === 'th' ? docType.descTh : docType.descEn}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Paper Width Selector */}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <button
+                              type="button"
+                              onClick={() => updateLayout({ paperWidth: '80mm' })}
+                              style={{
+                                padding: '4px 10px',
+                                borderRadius: 6,
+                                fontSize: 11,
+                                fontWeight: 700,
+                                border: currentLayout.paperWidth === '80mm' ? '1px solid var(--color-primary)' : '1px solid var(--color-border)',
+                                background: currentLayout.paperWidth === '80mm' ? 'rgba(245, 158, 11, 0.2)' : 'transparent',
+                                color: currentLayout.paperWidth === '80mm' ? 'var(--color-primary)' : 'var(--color-text-secondary)',
+                                cursor: 'pointer',
+                              }}
+                            >
+                              80mm (มาตรฐาน)
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => updateLayout({ paperWidth: '58mm' })}
+                              style={{
+                                padding: '4px 10px',
+                                borderRadius: 6,
+                                fontSize: 11,
+                                fontWeight: 700,
+                                border: currentLayout.paperWidth === '58mm' ? '1px solid var(--color-primary)' : '1px solid var(--color-border)',
+                                background: currentLayout.paperWidth === '58mm' ? 'rgba(245, 158, 11, 0.2)' : 'transparent',
+                                color: currentLayout.paperWidth === '58mm' ? 'var(--color-primary)' : 'var(--color-text-secondary)',
+                                cursor: 'pointer',
+                              }}
+                            >
+                              58mm (มินิ)
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Controls Grid */}
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
+                          {/* Header Title */}
+                          <div>
+                            <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-text-secondary)' }}>หัวกระดาษ (Header Title)</label>
+                            <input
+                              type="text"
+                              value={currentLayout.headerTitle}
+                              onChange={(e) => updateLayout({ headerTitle: e.target.value })}
+                              style={{ width: '100%', padding: '8px 10px', background: 'var(--color-bg-card)', border: '1px solid var(--color-border)', borderRadius: 6, color: '#fff', fontSize: 12, marginTop: 4 }}
+                            />
+                          </div>
+
+                          {/* Footnote */}
+                          <div>
+                            <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-text-secondary)' }}>ข้อความลงท้าย (Footnote Text)</label>
+                            <input
+                              type="text"
+                              value={currentLayout.footnote}
+                              onChange={(e) => updateLayout({ footnote: e.target.value })}
+                              style={{ width: '100%', padding: '8px 10px', background: 'var(--color-bg-card)', border: '1px solid var(--color-border)', borderRadius: 6, color: '#fff', fontSize: 12, marginTop: 4 }}
+                            />
+                          </div>
+
+                          {/* Font Size Scale */}
+                          <div>
+                            <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-text-secondary)' }}>ขนาดตัวหนังสือ (Font Scale)</label>
+                            <select
+                              value={currentLayout.fontSizeScale}
+                              onChange={(e) => updateLayout({ fontSizeScale: e.target.value as any })}
+                              style={{ width: '100%', padding: '8px 10px', background: 'var(--color-bg-card)', border: '1px solid var(--color-border)', borderRadius: 6, color: '#fff', fontSize: 12, marginTop: 4, cursor: 'pointer' }}
+                            >
+                              <option value="90">90% (ขนาดกระทัดรัด)</option>
+                              <option value="100">100% (ขนาดปกติมาตรฐาน)</option>
+                              <option value="110">110% (ขนาดใหญ่ อ่านง่าย)</option>
+                            </select>
+                          </div>
+                        </div>
+
+                        {/* Toggles */}
+                        <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', paddingTop: 4 }}>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#fff', cursor: 'pointer' }}>
+                            <input
+                              type="checkbox"
+                              checked={currentLayout.showLogo}
+                              onChange={(e) => updateLayout({ showLogo: e.target.checked })}
+                              style={{ accentColor: 'var(--color-primary)' }}
+                            />
+                            <span>แสดงโลโก้ร้าน</span>
+                          </label>
+
+                          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#fff', cursor: 'pointer' }}>
+                            <input
+                              type="checkbox"
+                              checked={currentLayout.showWifi}
+                              onChange={(e) => updateLayout({ showWifi: e.target.checked })}
+                              style={{ accentColor: 'var(--color-primary)' }}
+                            />
+                            <span>แสดงกล่อง WiFi ร้าน</span>
+                          </label>
+
+                          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#fff', cursor: 'pointer' }}>
+                            <input
+                              type="checkbox"
+                              checked={currentLayout.autoPrint}
+                              onChange={(e) => updateLayout({ autoPrint: e.target.checked })}
+                              style={{ accentColor: 'var(--color-primary)' }}
+                            />
+                            <span>สั่งพิมพ์อัตโนมัติ (Auto Print)</span>
+                          </label>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
 
               {/* Save Button */}
               <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 12, marginTop: 14, paddingTop: 16, borderTop: '1px solid var(--color-border)' }}>

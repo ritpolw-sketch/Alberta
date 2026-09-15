@@ -330,6 +330,26 @@ export interface PaymentChannelsSettings {
   card: CardGatewayConfig;
 }
 
+export type ThermalPaperWidth = '80mm' | '58mm';
+
+export interface SinglePrintLayoutConfig {
+  paperWidth: ThermalPaperWidth;
+  headerTitle: string;
+  showLogo: boolean;
+  showWifi: boolean;
+  showInstructions: boolean;
+  footnote: string;
+  autoPrint: boolean;
+  fontSizeScale: '90' | '100' | '110';
+}
+
+export interface PrintingLayoutSettings {
+  qrSlip: SinglePrintLayoutConfig;
+  customerReceipt: SinglePrintLayoutConfig;
+  kitchenTicket: SinglePrintLayoutConfig;
+  shiftSummary: SinglePrintLayoutConfig;
+}
+
 export interface RestaurantSettings {
   restaurantNameTh: string;
   restaurantNameEn: string;
@@ -346,6 +366,7 @@ export interface RestaurantSettings {
   addressEn: string;
   phone: string;
   paymentChannels?: PaymentChannelsSettings;
+  printLayouts?: PrintingLayoutSettings;
 }
 
 export interface QueuedCustomerOrderItem {

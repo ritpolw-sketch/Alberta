@@ -53,6 +53,48 @@ export const initialSettings: RestaurantSettings = {
       passFeeToCustomer: false,
     },
   },
+  printLayouts: {
+    qrSlip: {
+      paperWidth: '80mm',
+      headerTitle: 'ตุ๋นมัน (พระราม 3)',
+      showLogo: true,
+      showWifi: true,
+      showInstructions: true,
+      footnote: 'ขอบคุณที่ใช้บริการ สแกนสั่งอาหารได้ทันที',
+      autoPrint: false,
+      fontSizeScale: '100',
+    },
+    customerReceipt: {
+      paperWidth: '80mm',
+      headerTitle: 'ใบเสร็จรับเงิน / ใบกำกับภาษีอย่างย่อ',
+      showLogo: true,
+      showWifi: true,
+      showInstructions: false,
+      footnote: 'ขอบคุณที่อุดหนุน โอกาสหน้าเชิญใหม่ครับ',
+      autoPrint: true,
+      fontSizeScale: '100',
+    },
+    kitchenTicket: {
+      paperWidth: '80mm',
+      headerTitle: 'ใบสั่งอาหารเข้าครัว (Kitchen Ticket)',
+      showLogo: false,
+      showWifi: false,
+      showInstructions: true,
+      footnote: 'โปรดปรุงอาหารตามลำดับและหมายเหตุพิเศษ',
+      autoPrint: true,
+      fontSizeScale: '110',
+    },
+    shiftSummary: {
+      paperWidth: '80mm',
+      headerTitle: 'รายงานสรุปปิดกะ / ลิ้นชักเงิน (Shift Summary)',
+      showLogo: true,
+      showWifi: false,
+      showInstructions: false,
+      footnote: 'ตรวจสอบยอดเงินสดคงเหลือและสรุปกะเรียบร้อยแล้ว',
+      autoPrint: true,
+      fontSizeScale: '100',
+    },
+  },
 };
 
 export const initialStaff: StaffUser[] = [

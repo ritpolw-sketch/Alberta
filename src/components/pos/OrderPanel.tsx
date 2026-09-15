@@ -1069,6 +1069,21 @@ export const OrderPanel: React.FC<OrderPanelProps> = ({ hideMenuToggle = false }
 
 // Direct Thermal Print helper (triggers print directly, no confirmation modal)
 function triggerDirectPrint(order: Order, restSettings: RestaurantSettings, staffName: string) {
+  const layout = restSettings.printLayouts?.customerReceipt || {
+    paperWidth: '80mm',
+    headerTitle: 'ใบเสร็จรับเงิน / ใบกำกับภาษีอย่างย่อ',
+    showLogo: true,
+    showWifi: true,
+    showInstructions: false,
+    footnote: '🙏 ขอบพระคุณที่มาอุดหนุน 🙏',
+    autoPrint: true,
+    fontSizeScale: '100',
+  };
+
+  const paperSize = layout.paperWidth === '58mm' ? '58mm auto' : '80mm auto';
+  const fontSize = layout.fontSizeScale === '90' ? '11px' : layout.fontSizeScale === '110' ? '13px' : '12px';
+  const smallFontSize = layout.fontSizeScale === '90' ? '10px' : layout.fontSizeScale === '110' ? '12px' : '11px';
+
   const iframe = document.createElement('iframe');
   iframe.style.position = 'fixed';
   iframe.style.right = '0';
@@ -1087,7 +1102,7 @@ function triggerDirectPrint(order: Order, restSettings: RestaurantSettings, staf
           <span>฿${item.itemTotal.toLocaleString()}</span>
         </div>
         ${item.modifiers.length > 0
-          ? `<div style="font-size: 11px; color: #555; padding-left: 10px;">${item.modifiers
+          ? `<div style="font-size: ${smallFontSize}; color: #555; padding-left: 10px;">${item.modifiers
             .map((m) => m.optionNameTh)
             .join(', ')}</div>`
           : ''
@@ -1109,12 +1124,12 @@ function triggerDirectPrint(order: Order, restSettings: RestaurantSettings, staf
         <title>ใบเรียกเก็บเงิน - โต๊ะ ${order.tableName}</title>
         <style>
           @page {
-            size: 80mm auto;
+            size: ${paperSize};
             margin: 4mm;
           }
           body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Sarabun", sans-serif;
-            font-size: 12px;
+            font-size: ${fontSize};
             color: #000;
             margin: 0;
             padding: 8px 4px;
@@ -1125,26 +1140,27 @@ function triggerDirectPrint(order: Order, restSettings: RestaurantSettings, staf
           .divider { border-bottom: 1px dashed #000; margin: 8px 0; }
           .divider-double { border-bottom: 2px solid #000; margin: 8px 0; }
           .row { display: flex; justify-content: space-between; margin-bottom: 3px; }
+          .wifi-box { font-size: 10px; border: 1px dotted #000; padding: 4px; margin-top: 6px; }
         </style>
       </head>
       <body>
         <div class="text-center">
-          <div style="font-size: 16px; font-weight: 800;">${restSettings.restaurantNameTh}</div>
-          <div style="font-size: 11px;">${restSettings.restaurantNameEn}</div>
+          ${layout.showLogo ? `<div style="font-size: 16px; font-weight: 800;">${restSettings.restaurantNameTh}</div>` : ''}
+          <div style="font-size: ${smallFontSize};">${restSettings.restaurantNameEn}</div>
           <div style="font-size: 10px; margin-top: 2px;">${restSettings.branchName} • Tax: ${restSettings.taxId}</div>
           <div style="font-size: 10px;">โทร: ${restSettings.phone}</div>
-          <div class="bold" style="font-size: 12px; margin-top: 6px;">ใบเรียกเก็บเงิน / ใบเสร็จรับเงิน</div>
+          <div class="bold" style="font-size: ${fontSize}; margin-top: 6px;">${layout.headerTitle || 'ใบเรียกเก็บเงิน / ใบเสร็จรับเงิน'}</div>
         </div>
         <div class="divider"></div>
         <div class="row">
           <span>บิล: ${order.orderNumber}</span>
           <span>โต๊ะ: <strong>${order.tableName}</strong></span>
         </div>
-        <div class="row" style="font-size: 11px;">
+        <div class="row" style="font-size: ${smallFontSize};">
           <span>วันที่: ${new Date().toLocaleDateString('th-TH')}</span>
           <span>เวลา: ${new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })}</span>
         </div>
-        <div style="font-size: 11px;">พนักงาน: ${staffName}</div>
+        <div style="font-size: ${smallFontSize};">พนักงาน: ${staffName}</div>
         <div class="divider"></div>
         <div>
           ${itemsHtml}
@@ -1162,7 +1178,7 @@ function triggerDirectPrint(order: Order, restSettings: RestaurantSettings, staf
       : ''
     }
         ${restSettings.enableVat
-      ? `<div class="row" style="font-size: 11px; color: #444;">
+      ? `<div class="row" style="font-size: ${smallFontSize}; color: #444;">
                 <span>${restSettings.isVatInclusive ? 'ภาษีมูลค่าเพิ่ม 7% (รวมในราคา)' : 'ภาษีมูลค่าเพิ่ม VAT 7%'}</span>
                 <span>฿${order.vatAmount.toLocaleString()}</span>
               </div>`
@@ -1173,9 +1189,14 @@ function triggerDirectPrint(order: Order, restSettings: RestaurantSettings, staf
           <span>ยอดสุทธิ (Total)</span>
           <span>฿${order.grandTotal.toLocaleString()}</span>
         </div>
+        ${layout.showWifi ? `
         <div class="divider"></div>
-        <div class="text-center" style="font-size: 11px; margin-top: 8px;">
-          <div>🙏 ขอบคุณที่ใช้บริการ 🙏</div>
+        <div class="wifi-box text-center">
+          📶 Free WiFi: <strong>Alberta_Guest</strong> | Pass: <strong>alberta888</strong>
+        </div>` : ''}
+        <div class="divider"></div>
+        <div class="text-center" style="font-size: ${smallFontSize}; margin-top: 8px;">
+          <div>${layout.footnote || '🙏 ขอบคุณที่ใช้บริการ 🙏'}</div>
           <div style="font-size: 9px; margin-top: 4px; color: #666;">Powered by Project Alberta POS</div>
         </div>
       </body>
@@ -1202,6 +1223,21 @@ function triggerDirectPrint(order: Order, restSettings: RestaurantSettings, staf
 }
 
 function triggerDirectPrintQRSlip(table: Table, settings: RestaurantSettings) {
+  const qrLayout = settings.printLayouts?.qrSlip || {
+    paperWidth: '80mm',
+    headerTitle: 'สแกนเพื่อสั่งอาหาร (Scan to Order)',
+    showLogo: true,
+    showWifi: true,
+    showInstructions: true,
+    footnote: 'ขอบคุณที่ใช้บริการ / Thank you!',
+    autoPrint: false,
+    fontSizeScale: '100',
+  };
+
+  const bodyWidth = qrLayout.paperWidth === '58mm' ? '52mm' : '72mm';
+  const paperSize = qrLayout.paperWidth === '58mm' ? '58mm auto' : '80mm auto';
+  const fontSize = qrLayout.fontSizeScale === '90' ? '10px' : qrLayout.fontSizeScale === '110' ? '12px' : '11px';
+
   const origin = window.location.origin;
   const sessionCode = `SESSION-${table.id}-${Date.now().toString().slice(-4)}`;
   const orderUrl = `${origin}/customer-order?table=${table.id}&number=${table.number}&session=${sessionCode}`;
@@ -1222,20 +1258,20 @@ function triggerDirectPrintQRSlip(table: Table, settings: RestaurantSettings) {
       <head>
         <title>Order QR Slip - Table ${table.number}</title>
         <style>
-          @page { margin: 0; size: 80mm auto; }
+          @page { margin: 0; size: ${paperSize}; }
           body {
             font-family: 'Prompt', 'Courier New', monospace;
-            width: 72mm;
+            width: ${bodyWidth};
             margin: 0 auto;
             padding: 8px 4px;
             color: #000;
             background: #fff;
-            font-size: 11px;
+            font-size: ${fontSize};
           }
           .text-center { text-align: center; }
           .bold { font-weight: 800; }
           .table-badge {
-            font-size: 24px;
+            font-size: ${qrLayout.fontSizeScale === '110' ? '26px' : qrLayout.fontSizeScale === '90' ? '22px' : '24px'};
             font-weight: 900;
             margin: 8px 0;
             padding: 6px;
@@ -1243,8 +1279,8 @@ function triggerDirectPrintQRSlip(table: Table, settings: RestaurantSettings) {
             display: inline-block;
           }
           .qr-img {
-            width: 180px;
-            height: 180px;
+            width: ${qrLayout.paperWidth === '58mm' ? '140px' : '180px'};
+            height: ${qrLayout.paperWidth === '58mm' ? '140px' : '180px'};
             margin: 8px auto;
             display: block;
           }
@@ -1255,22 +1291,24 @@ function triggerDirectPrintQRSlip(table: Table, settings: RestaurantSettings) {
       </head>
       <body>
         <div class="text-center">
-          <div class="bold" style="font-size: 14px;">${settings.restaurantNameTh}</div>
+          ${qrLayout.showLogo ? `<div class="bold" style="font-size: 14px;">${settings.restaurantNameTh}</div>` : ''}
           <div style="font-size: 10px;">${settings.restaurantNameEn || 'Project Alberta'} • ${settings.branchName || 'Main'}</div>
           <div class="table-badge">โต๊ะ ${table.number}</div>
-          <div class="bold">สแกนเพื่อดูเมนูและสั่งอาหาร</div>
+          <div class="bold">${qrLayout.headerTitle || 'สแกนเพื่อดูเมนูและสั่งอาหาร'}</div>
           <img class="qr-img" src="${qrApiUrl}" alt="Order QR Code" />
           <div class="instructions">
             1. เปิดกล้องถ่ายรูป หรือ LINE บนมือถือ<br/>
             2. สแกน QR Code เพื่อดูเมนูอาหาร<br/>
             3. เลือกอาหารและกดส่งรายการเข้าครัวได้ทันที
           </div>
+          ${qrLayout.showWifi ? `
           <div class="divider"></div>
           <div class="wifi-box">
             📶 Free WiFi: <strong>Alberta_Guest</strong> | Pass: <strong>alberta888</strong>
-          </div>
+          </div>` : ''}
+          <div class="divider"></div>
           <div style="font-size: 9px; margin-top: 6px; color: #555;">
-            พิมพ์เมื่อ: ${new Date().toLocaleDateString('th-TH')} ${new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })}
+            ${qrLayout.footnote || 'ขอบคุณที่ใช้บริการ / Thank you!'} • พิมพ์เมื่อ: ${new Date().toLocaleDateString('th-TH')} ${new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })}
           </div>
         </div>
       </body>

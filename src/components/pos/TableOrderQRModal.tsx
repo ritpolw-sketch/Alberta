@@ -6,8 +6,6 @@ import {
   X,
   Copy,
   Check,
-  Wifi,
-  Clock,
 } from 'lucide-react';
 import type { Table } from '../../types/pos';
 
@@ -49,8 +47,23 @@ export const TableOrderQRModal: React.FC<TableOrderQRModalProps> = ({
     setTimeout(() => setCopied(false), 2000);
   };
 
-  // Direct 80mm Thermal Receipt Printing for QR Slip
+  // Direct Thermal Receipt Printing for QR Slip
   const handlePrintQRSlip = () => {
+    const qrLayout = settings.printLayouts?.qrSlip || {
+      paperWidth: '80mm',
+      headerTitle: 'สแกนเพื่อสั่งอาหาร (Scan to Order)',
+      showLogo: true,
+      showWifi: true,
+      showInstructions: true,
+      footnote: 'ขอบคุณที่ใช้บริการ / Thank you!',
+      autoPrint: false,
+      fontSizeScale: '100',
+    };
+
+    const bodyWidth = qrLayout.paperWidth === '58mm' ? '52mm' : '72mm';
+    const paperSize = qrLayout.paperWidth === '58mm' ? '58mm auto' : '80mm auto';
+    const fontSize = qrLayout.fontSizeScale === '90' ? '10px' : qrLayout.fontSizeScale === '110' ? '12px' : '11px';
+
     const iframe = document.createElement('iframe');
     iframe.style.position = 'fixed';
     iframe.style.right = '0';
@@ -66,20 +79,20 @@ export const TableOrderQRModal: React.FC<TableOrderQRModalProps> = ({
         <head>
           <title>Order QR Slip - Table ${table.number}</title>
           <style>
-            @page { margin: 0; size: 80mm auto; }
+            @page { margin: 0; size: ${paperSize}; }
             body {
               font-family: 'Prompt', 'Courier New', monospace;
-              width: 72mm;
+              width: ${bodyWidth};
               margin: 0 auto;
               padding: 8px 4px;
               color: #000;
               background: #fff;
-              font-size: 11px;
+              font-size: ${fontSize};
             }
             .text-center { text-align: center; }
             .bold { font-weight: 800; }
             .table-badge {
-              font-size: 24px;
+              font-size: ${qrLayout.fontSizeScale === '110' ? '26px' : qrLayout.fontSizeScale === '90' ? '22px' : '24px'};
               font-weight: 900;
               margin: 8px 0;
               padding: 6px;
@@ -87,8 +100,8 @@ export const TableOrderQRModal: React.FC<TableOrderQRModalProps> = ({
               display: inline-block;
             }
             .qr-img {
-              width: 180px;
-              height: 180px;
+              width: ${qrLayout.paperWidth === '58mm' ? '140px' : '180px'};
+              height: ${qrLayout.paperWidth === '58mm' ? '140px' : '180px'};
               margin: 8px auto;
               display: block;
             }
@@ -99,22 +112,24 @@ export const TableOrderQRModal: React.FC<TableOrderQRModalProps> = ({
         </head>
         <body>
           <div class="text-center">
-            <div class="bold" style="font-size: 14px;">${settings.restaurantNameTh}</div>
+            ${qrLayout.showLogo ? `<div class="bold" style="font-size: 14px;">${settings.restaurantNameTh}</div>` : ''}
             <div style="font-size: 10px;">${settings.restaurantNameEn} • ${settings.branchName}</div>
             <div class="table-badge">โต๊ะ ${table.number}</div>
-            <div>สแกนเพื่อดูเมนูและสั่งอาหาร</div>
+            <div class="bold">${qrLayout.headerTitle || 'สแกนเพื่อดูเมนูและสั่งอาหาร'}</div>
             <img class="qr-img" src="${qrApiUrl}" alt="Order QR Code" />
             <div class="instructions">
               1. เปิดกล้องถ่ายรูป หรือ LINE บนมือถือ<br/>
               2. สแกน QR Code เพื่อดูเมนูอาหาร<br/>
               3. เลือกอาหารและกดส่งรายการเข้าครัวได้ทันที
             </div>
+            ${qrLayout.showWifi ? `
             <div class="divider"></div>
             <div class="wifi-box">
               📶 Free WiFi: <strong>Alberta_Guest</strong> | Pass: <strong>alberta888</strong>
-            </div>
+            </div>` : ''}
+            <div class="divider"></div>
             <div style="font-size: 9px; margin-top: 6px; color: #555;">
-              พิมพ์เมื่อ: ${new Date().toLocaleDateString('th-TH')} ${new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })}
+              ${qrLayout.footnote || 'ขอบคุณที่ใช้บริการ / Thank you!'} • พิมพ์เมื่อ: ${new Date().toLocaleDateString('th-TH')} ${new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })}
             </div>
           </div>
         </body>
@@ -140,45 +155,44 @@ export const TableOrderQRModal: React.FC<TableOrderQRModalProps> = ({
     }
   };
 
+  const qrPaperWidth = settings.printLayouts?.qrSlip?.paperWidth || '80mm';
+
   return (
     <div
       onClick={onClose}
       style={{
         position: 'fixed',
         inset: 0,
-        background: 'rgba(5, 8, 16, 0.85)',
-        backdropFilter: 'blur(8px)',
+        zIndex: 999,
+        background: 'rgba(5, 7, 13, 0.85)',
+        backdropFilter: 'blur(10px)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        zIndex: 1000,
         padding: 16,
       }}
     >
       <div
         onClick={(e) => e.stopPropagation()}
         style={{
-          background: 'var(--color-bg-card)',
-          border: '1.5px solid var(--color-border-glow)',
-          borderRadius: 'var(--radius-xl)',
           width: '100%',
           maxWidth: 440,
-          maxHeight: '92vh',
-          display: 'flex',
-          flexDirection: 'column',
+          background: 'var(--color-bg-surface)',
+          border: '1px solid var(--color-border-subtle)',
+          borderRadius: 'var(--radius-xl)',
           overflow: 'hidden',
-          boxShadow: '0 25px 60px rgba(0,0,0,0.85)',
+          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.6)',
         }}
       >
         {/* Modal Header */}
         <div
           style={{
-            padding: '14px 20px',
-            background: 'var(--color-bg-elevated)',
-            borderBottom: '1px solid var(--color-border)',
+            padding: '16px 20px',
+            borderBottom: '1px solid var(--color-border-subtle)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
+            background: 'var(--color-bg-elevated)',
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -186,10 +200,9 @@ export const TableOrderQRModal: React.FC<TableOrderQRModalProps> = ({
               style={{
                 width: 36,
                 height: 36,
-                borderRadius: 10,
+                borderRadius: 'var(--radius-md)',
                 background: 'rgba(245, 158, 11, 0.15)',
-                border: '1px solid var(--color-primary)',
-                color: 'var(--color-primary)',
+                color: '#f59e0b',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -198,11 +211,11 @@ export const TableOrderQRModal: React.FC<TableOrderQRModalProps> = ({
               <QrCode size={20} />
             </div>
             <div>
-              <h3 style={{ fontSize: 16, fontWeight: 800, color: '#fff' }}>
-                {language === 'th' ? `QR Code สั่งอาหาร - โต๊ะ ${table.number}` : `Table ${table.number} Order QR`}
+              <h3 style={{ fontSize: 16, fontWeight: 700, margin: 0, color: 'var(--color-text-primary)' }}>
+                {language === 'th' ? `QR Code สั่งอาหาร - โต๊ะ ${table.number}` : `Order QR - Table ${table.number}`}
               </h3>
-              <p style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>
-                {language === 'th' ? 'พิมพ์สลิป QR หรือแชร์ลิงก์ให้ลูกค้าสแกนสั่งอาหารด้วยตัวเอง' : 'Print QR slip or share ordering link for customer self-service'}
+              <p style={{ fontSize: 12, margin: 0, color: 'var(--color-text-secondary)' }}>
+                {table.zone || 'Indoor'} Zone • {table.capacity} {language === 'th' ? 'ที่นั่ง' : 'seats'}
               </p>
             </div>
           </div>
@@ -210,97 +223,86 @@ export const TableOrderQRModal: React.FC<TableOrderQRModalProps> = ({
           <button
             onClick={onClose}
             style={{
+              padding: 6,
+              borderRadius: 'var(--radius-md)',
               background: 'transparent',
               border: 'none',
               color: 'var(--color-text-secondary)',
               cursor: 'pointer',
-              padding: 4,
-              borderRadius: 6,
             }}
           >
-            <X size={20} />
+            <X size={18} />
           </button>
         </div>
 
-        {/* Modal Body */}
-        <div
-          style={{
-            flex: 1,
-            overflowY: 'auto',
-            padding: 20,
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-          }}
-        >
-          {/* Main 80mm Thermal Receipt QR Slip Preview Card */}
+        {/* Slip Container */}
+        <div style={{ padding: 24, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+          <p style={{ fontSize: 13, color: 'var(--color-text-secondary)', textAlign: 'center', margin: '0 0 16px 0' }}>
+            {language === 'th' ? 'พิมพ์สลิป QR หรือแชร์ลิงก์ให้ลูกค้าสแกนสั่งอาหารด้วยตัวเอง' : 'Print QR slip or share ordering link for customer self-service'}
+          </p>
+
+          {/* Printable Ticket Box */}
           <div
             style={{
               width: '100%',
-              maxWidth: 340,
-              margin: '0 auto',
+              maxWidth: 300,
               background: '#ffffff',
               color: '#000000',
+              padding: '20px 16px',
               borderRadius: 'var(--radius-md)',
-              padding: 20,
-              boxShadow: '0 10px 30px rgba(0,0,0,0.5)',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
+              boxShadow: '0 10px 25px rgba(0,0,0,0.5)',
               textAlign: 'center',
               fontFamily: "'Prompt', sans-serif",
-              position: 'relative',
-              userSelect: 'text',
             }}
           >
-            <div style={{ fontSize: 13, fontWeight: 800 }}>{settings.restaurantNameTh}</div>
-            <div style={{ fontSize: 10, color: '#444' }}>{settings.branchName}</div>
+            <div style={{ fontWeight: 800, fontSize: 15 }}>{settings.restaurantNameTh}</div>
+            <div style={{ fontSize: 11, color: '#555' }}>{settings.restaurantNameEn} • {settings.branchName}</div>
 
-            {/* Big Table Badge */}
             <div
               style={{
-                fontSize: 22,
+                margin: '12px auto',
+                padding: '6px 14px',
+                border: '2px solid #000',
+                display: 'inline-block',
                 fontWeight: 900,
-                marginTop: 8,
-                marginBottom: 6,
-                padding: '4px 16px',
-                border: '2.5px solid #000',
-                borderRadius: 8,
-                background: '#fafafa',
+                fontSize: 22,
+                borderRadius: 4,
               }}
             >
-              {language === 'th' ? `โต๊ะ ${table.number}` : `Table ${table.number}`}
-            </div>
-            <div style={{ fontSize: 11, fontWeight: 700, color: '#333' }}>
-              📲 {language === 'th' ? 'สแกนเพื่อดูเมนูและสั่งอาหารเข้าครัว' : 'Scan to view menu & order'}
+              โต๊ะ {table.number}
             </div>
 
-            {/* Dynamic QR Code Image */}
-            <div style={{ margin: '12px 0', padding: 8, background: '#fff', borderRadius: 8, border: '1px dashed #ccc' }}>
-              <img
-                src={qrApiUrl}
-                alt={`Table ${table.number} Order QR Code`}
-                style={{ width: 180, height: 180, display: 'block' }}
-              />
+            <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 10 }}>
+              {settings.printLayouts?.qrSlip?.headerTitle || 'สแกนเพื่อดูเมนูและสั่งอาหาร'}
             </div>
 
-            {/* Instructions list */}
-            <div style={{ fontSize: 10, color: '#555', textAlign: 'left', width: '100%', lineHeight: 1.5, background: '#f5f5f5', padding: '8px 10px', borderRadius: 6 }}>
-              <div>1️⃣ เปิดกล้องถ่ายรูป หรือแอป LINE บนมือถือ</div>
-              <div>2️⃣ สแกน QR Code นี้เพื่อเปิดเมนูอาหาร</div>
-              <div>3️⃣ เลือกเมนูและกดส่งรายการเข้าครัวได้ทันที</div>
+            <img
+              src={qrApiUrl}
+              alt={`QR Code Table ${table.number}`}
+              style={{ width: 180, height: 180, display: 'block', margin: '0 auto 12px auto' }}
+            />
+
+            <div style={{ fontSize: 11, color: '#444', lineHeight: 1.4 }}>
+              1. เปิดกล้องถ่ายรูป หรือ LINE บนมือถือ<br />
+              2. สแกน QR Code เพื่อดูเมนูอาหาร<br />
+              3. เลือกอาหารและกดส่งรายการเข้าครัวได้ทันที
             </div>
 
-            {/* WiFi Credentials Box */}
-            <div style={{ fontSize: 10, width: '100%', marginTop: 8, padding: '4px 6px', border: '1px dotted #888', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-              <Wifi size={12} />
-              <span>Free WiFi: <strong>Alberta_Guest</strong> | Pass: <strong>alberta888</strong></span>
-            </div>
+            <div style={{ borderBottom: '1px dashed #000', margin: '12px 0' }} />
 
-            <div style={{ fontSize: 9, color: '#888', marginTop: 8, display: 'flex', alignItems: 'center', gap: 4 }}>
-              <Clock size={10} />
-              <span>{language === 'th' ? 'รหัสสั่งอาหารเปิดใช้งาน 3 ชม.' : 'Session active for 3 hrs'}</span>
-            </div>
+            {settings.printLayouts?.qrSlip?.showWifi !== false && (
+              <div
+                style={{
+                  fontSize: 10,
+                  border: '1px dotted #000',
+                  padding: 6,
+                  borderRadius: 4,
+                  background: '#fafafa',
+                }}
+              >
+                📶 Free WiFi: <strong>Alberta_Guest</strong> | Pass: <strong>alberta888</strong>
+              </div>
+            )}
           </div>
         </div>
 
@@ -308,8 +310,8 @@ export const TableOrderQRModal: React.FC<TableOrderQRModalProps> = ({
         <div
           style={{
             padding: '12px 20px',
+            borderTop: '1px solid var(--color-border-subtle)',
             background: 'var(--color-bg-elevated)',
-            borderTop: '1px solid var(--color-border)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'flex-end',
@@ -319,11 +321,22 @@ export const TableOrderQRModal: React.FC<TableOrderQRModalProps> = ({
           {/* Copy Link Button */}
           <button
             onClick={handleCopyLink}
-            className="btn-secondary"
-            style={{ padding: '8px 14px', fontSize: 13, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}
-            title="Copy URL"
+            style={{
+              padding: '8px 16px',
+              borderRadius: 'var(--radius-md)',
+              background: copied ? 'rgba(34, 197, 94, 0.2)' : 'var(--color-bg-surface)',
+              border: `1px solid ${copied ? '#22c55e' : 'var(--color-border-subtle)'}`,
+              color: copied ? '#22c55e' : 'var(--color-text-primary)',
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              transition: 'all 0.2s ease',
+            }}
           >
-            {copied ? <Check size={15} style={{ color: '#10b981' }} /> : <Copy size={15} />}
+            {copied ? <Check size={16} /> : <Copy size={16} />}
             <span>{copied ? (language === 'th' ? 'คัดลอกแล้ว!' : 'Copied!') : (language === 'th' ? 'คัดลอกลิงก์' : 'Copy Link')}</span>
           </button>
 
@@ -346,7 +359,7 @@ export const TableOrderQRModal: React.FC<TableOrderQRModalProps> = ({
             }}
           >
             <Printer size={16} />
-            <span>{language === 'th' ? 'พิมพ์สลิป QR (80mm)' : 'Print QR Slip'}</span>
+            <span>{language === 'th' ? `พิมพ์สลิป QR (${qrPaperWidth})` : `Print QR Slip (${qrPaperWidth})`}</span>
           </button>
         </div>
       </div>

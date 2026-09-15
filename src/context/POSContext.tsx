@@ -208,6 +208,26 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               ...(parsed.paymentChannels?.card || {}),
             },
           },
+          printLayouts: {
+            ...initialSettings.printLayouts!,
+            ...(parsed.printLayouts || {}),
+            qrSlip: {
+              ...(initialSettings.printLayouts?.qrSlip!),
+              ...(parsed.printLayouts?.qrSlip || {}),
+            },
+            customerReceipt: {
+              ...(initialSettings.printLayouts?.customerReceipt!),
+              ...(parsed.printLayouts?.customerReceipt || {}),
+            },
+            kitchenTicket: {
+              ...(initialSettings.printLayouts?.kitchenTicket!),
+              ...(parsed.printLayouts?.kitchenTicket || {}),
+            },
+            shiftSummary: {
+              ...(initialSettings.printLayouts?.shiftSummary!),
+              ...(parsed.printLayouts?.shiftSummary || {}),
+            },
+          },
         };
       } catch (e) {
         console.error('Error parsing settings from localStorage', e);
