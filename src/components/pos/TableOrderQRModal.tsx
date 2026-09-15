@@ -298,7 +298,7 @@ export const TableOrderQRModal: React.FC<TableOrderQRModalProps> = ({
           </div>
         </div>
 
-        {/* Modal Actions Footer - Always Right-Aligned */}
+        {/* Modal Actions Footer - Copy Link & Print Side-by-Side Right Aligned */}
         <div
           style={{
             padding: '12px 20px',
@@ -314,20 +314,11 @@ export const TableOrderQRModal: React.FC<TableOrderQRModalProps> = ({
           <button
             onClick={handleCopyLink}
             className="btn-secondary"
-            style={{ padding: '8px 12px', fontSize: 12, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 5 }}
+            style={{ padding: '8px 14px', fontSize: 13, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}
             title="Copy URL"
           >
-            {copied ? <Check size={14} style={{ color: '#10b981' }} /> : <Copy size={14} />}
+            {copied ? <Check size={15} style={{ color: '#10b981' }} /> : <Copy size={15} />}
             <span>{copied ? (language === 'th' ? 'คัดลอกแล้ว!' : 'Copied!') : (language === 'th' ? 'คัดลอกลิงก์' : 'Copy Link')}</span>
-          </button>
-
-          {/* Close Button */}
-          <button
-            onClick={onClose}
-            className="btn-secondary"
-            style={{ padding: '8px 14px', fontSize: 12, fontWeight: 700 }}
-          >
-            {language === 'th' ? 'ปิด' : 'Close'}
           </button>
 
           {/* Direct Thermal Slip Printer Button */}
