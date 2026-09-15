@@ -217,9 +217,9 @@ export const CustomerOrderPage: React.FC = () => {
   const handleConfirmOrderToKitchen = () => {
     if (draftCart.length === 0) return;
 
-    // Dispatch all items to POSContext
+    // Dispatch all items to POSContext specifically for this tableId
     draftCart.forEach((draft) => {
-      addItemToOrder(draft.menuItem, draft.modifiers, draft.instructions, draft.quantity);
+      addItemToOrder(draft.menuItem, draft.modifiers, draft.instructions, draft.quantity, tableId);
     });
 
     // Clear draft cart & trigger celebration

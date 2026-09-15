@@ -88,7 +88,8 @@ interface POSContextType {
     item: MenuItem,
     modifiers: SelectedModifier[],
     instructions?: string,
-    quantity?: number
+    quantity?: number,
+    targetTableId?: string
   ) => void;
   quickAddItemToOrder: (item: MenuItem) => void;
   updateOrderItemQuantity: (orderItemId: string, delta: number) => void;
@@ -635,9 +636,12 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     menuItem: MenuItem,
     modifiers: SelectedModifier[],
     instructions?: string,
-    quantity = 1
+    quantity = 1,
+    targetTableId?: string
   ) => {
-    if (!activeTableId || !activeTable) return;
+    const effectiveTableId = targetTableId || activeTableId;
+    const effectiveTable = tables.find((t) => t.id === effectiveTableId);
+    if (!effectiveTableId || !effectiveTable) return;
 
     const modifierDelta = modifiers.reduce((acc, m) => acc + m.priceDelta, 0);
     const itemTotal = (menuItem.price + modifierDelta) * quantity;
@@ -656,7 +660,9 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       status: 'pending',
     };
 
-    let targetOrder = activeOrder;
+    let targetOrder = Object.values(orders).find(
+      (o) => o.tableId === effectiveTableId && o.status === 'active'
+    ) || null;
 
     if (!targetOrder) {
       // Create new order
@@ -668,9 +674,9 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const createdOrder: Order = {
         id: orderId,
         orderNumber: `#${orderId.slice(-4)}`,
-        tableId: activeTable.id,
-        tableName: activeTable.number,
-        guestCount: activeTable.guestCount || 2,
+        tableId: effectiveTable.id,
+        tableName: effectiveTable.number,
+        guestCount: effectiveTable.guestCount || 2,
         items: newItems,
         status: 'active',
         createdAt: new Date().toISOString(),
@@ -687,10 +693,10 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       };
 
       setOrders((prev) => ({ ...prev, [orderId]: createdOrder }));
-      updateTableStatus(activeTable.id, 'occupied');
+      updateTableStatus(effectiveTable.id, 'occupied');
       setTables((prev) =>
         prev.map((t) =>
-          t.id === activeTable.id ? { ...t, seatedAt: new Date().toISOString() } : t
+          t.id === effectiveTable.id ? { ...t, seatedAt: new Date().toISOString() } : t
         )
       );
     } else {
