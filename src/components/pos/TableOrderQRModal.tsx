@@ -6,14 +6,10 @@ import {
   X,
   Copy,
   Check,
-  Smartphone,
   Wifi,
   Clock,
-  ArrowRight,
-  ShoppingBag,
 } from 'lucide-react';
-import type { Table, MenuItem } from '../../types/pos';
-import confetti from 'canvas-confetti';
+import type { Table } from '../../types/pos';
 
 interface TableOrderQRModalProps {
   isOpen: boolean;
@@ -26,17 +22,14 @@ export const TableOrderQRModal: React.FC<TableOrderQRModalProps> = ({
   onClose,
   table,
 }) => {
-  const { settings, language, menuItems, quickAddItemToOrder } = usePOS();
+  const { settings, language } = usePOS();
   const [copied, setCopied] = useState(false);
-  const [isSimulatingCustomer, setIsSimulatingCustomer] = useState(false);
-  const [customerCart, setCustomerCart] = useState<{ item: MenuItem; qty: number }[]>([]);
-  const [orderSentSuccess, setOrderSentSuccess] = useState(false);
 
   if (!isOpen || !table) return null;
 
   // Generate Table QR Code URL
   const sessionCode = `SES-${table.id.toUpperCase()}-${Date.now().toString().slice(-4)}`;
-  const orderUrl = `${window.location.origin}/order?table=${encodeURIComponent(
+  const orderUrl = `${window.location.origin}/customer-order?table=${encodeURIComponent(
     table.id
   )}&code=${encodeURIComponent(table.number)}&session=${sessionCode}`;
   
@@ -143,41 +136,6 @@ export const TableOrderQRModal: React.FC<TableOrderQRModalProps> = ({
     }
   };
 
-  // Customer Self-Order Simulator Handlers
-  const handleAddSimulatorItem = (item: MenuItem) => {
-    setCustomerCart((prev) => {
-      const existing = prev.find((c) => c.item.id === item.id);
-      if (existing) {
-        return prev.map((c) =>
-          c.item.id === item.id ? { ...c, qty: c.qty + 1 } : c
-        );
-      }
-      return [...prev, { item, qty: 1 }];
-    });
-  };
-
-  const handleSendSimulatorOrder = () => {
-    if (customerCart.length === 0) return;
-    customerCart.forEach(({ item, qty }) => {
-      for (let i = 0; i < qty; i++) {
-        quickAddItemToOrder(item);
-      }
-    });
-
-    setOrderSentSuccess(true);
-    confetti({
-      particleCount: 50,
-      spread: 60,
-      origin: { y: 0.6 },
-    });
-
-    setTimeout(() => {
-      setOrderSentSuccess(false);
-      setCustomerCart([]);
-      setIsSimulatingCustomer(false);
-    }, 1500);
-  };
-
   return (
     <div
       style={{
@@ -198,13 +156,12 @@ export const TableOrderQRModal: React.FC<TableOrderQRModalProps> = ({
           border: '1.5px solid var(--color-border-glow)',
           borderRadius: 'var(--radius-xl)',
           width: '100%',
-          maxWidth: isSimulatingCustomer ? 780 : 460,
+          maxWidth: 440,
           maxHeight: '92vh',
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden',
           boxShadow: '0 25px 60px rgba(0,0,0,0.85)',
-          transition: 'all 0.3s ease',
         }}
       >
         {/* Modal Header */}
@@ -266,15 +223,14 @@ export const TableOrderQRModal: React.FC<TableOrderQRModalProps> = ({
             overflowY: 'auto',
             padding: 20,
             display: 'flex',
-            gap: 20,
-            flexDirection: isSimulatingCustomer ? 'row' : 'column',
-            alignItems: isSimulatingCustomer ? 'stretch' : 'center',
+            flexDirection: 'column',
+            alignItems: 'center',
           }}
         >
           {/* Main 80mm Thermal Receipt QR Slip Preview Card */}
           <div
             style={{
-              width: isSimulatingCustomer ? 320 : '100%',
+              width: '100%',
               maxWidth: 340,
               margin: '0 auto',
               background: '#ffffff',
@@ -340,133 +296,9 @@ export const TableOrderQRModal: React.FC<TableOrderQRModalProps> = ({
               <span>{language === 'th' ? 'รหัสสั่งอาหารเปิดใช้งาน 3 ชม.' : 'Session active for 3 hrs'}</span>
             </div>
           </div>
-
-          {/* Optional: Customer Self-Ordering Mobile Phone Simulator */}
-          {isSimulatingCustomer && (
-            <div
-              style={{
-                flex: 1,
-                minWidth: 320,
-                background: '#090d16',
-                borderRadius: 'var(--radius-lg)',
-                border: '1px solid var(--color-border)',
-                padding: 14,
-                display: 'flex',
-                flexDirection: 'column',
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, paddingBottom: 6, borderBottom: '1px solid var(--color-border)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--color-primary)' }}>
-                  <Smartphone size={16} />
-                  <span style={{ fontSize: 12, fontWeight: 800 }}>
-                    {language === 'th' ? `หน้าจอมือถือลูกค้า (โต๊ะ ${table.number})` : `Customer Phone View (Table ${table.number})`}
-                  </span>
-                </div>
-                <button
-                  onClick={() => setIsSimulatingCustomer(false)}
-                  style={{ background: 'transparent', border: 'none', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer' }}
-                >
-                  ✕ {language === 'th' ? 'ซ่อน' : 'Hide'}
-                </button>
-              </div>
-
-              {/* Mobile Menu Catalog */}
-              <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8, paddingRight: 4 }}>
-                <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginBottom: 2 }}>
-                  {language === 'th' ? 'แตะอาหารเพื่อลองสั่งเข้า POS ทันที:' : 'Tap food items to test instant ordering:'}
-                </div>
-                {menuItems.slice(0, 6).map((item) => (
-                  <div
-                    key={item.id}
-                    onClick={() => handleAddSimulatorItem(item)}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 8,
-                      background: 'var(--color-bg-card)',
-                      padding: 8,
-                      borderRadius: 8,
-                      border: '1px solid var(--color-border)',
-                      cursor: 'pointer',
-                      transition: 'all 0.15s ease',
-                    }}
-                  >
-                    <div style={{ width: 34, height: 34, borderRadius: 6, background: '#1e293b', overflow: 'hidden', flexShrink: 0 }}>
-                      {item.imageUrl ? (
-                        <img src={item.imageUrl} alt={item.nameTh} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                      ) : (
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', fontSize: 16 }}>🍽️</div>
-                      )}
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 12, fontWeight: 700, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                        {language === 'th' ? item.nameTh : item.nameEn}
-                      </div>
-                      <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--color-primary)' }}>฿{item.price}</div>
-                    </div>
-                    <button
-                      style={{
-                        padding: '4px 8px',
-                        borderRadius: 6,
-                        background: 'rgba(245, 158, 11, 0.15)',
-                        border: '1px solid var(--color-primary)',
-                        color: 'var(--color-primary)',
-                        fontSize: 11,
-                        fontWeight: 800,
-                        cursor: 'pointer',
-                      }}
-                    >
-                      + เพิ่ม
-                    </button>
-                  </div>
-                ))}
-              </div>
-
-              {/* Customer Mobile Cart Footer */}
-              <div style={{ marginTop: 10, paddingTop: 8, borderTop: '1px solid var(--color-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <div style={{ fontSize: 12, fontWeight: 700, color: '#fff' }}>
-                  <ShoppingBag size={14} style={{ display: 'inline', marginRight: 4, color: 'var(--color-primary)' }} />
-                  {customerCart.reduce((sum, c) => sum + c.qty, 0)} {language === 'th' ? 'รายการ' : 'items'}
-                </div>
-
-                <button
-                  onClick={handleSendSimulatorOrder}
-                  disabled={customerCart.length === 0 || orderSentSuccess}
-                  style={{
-                    padding: '8px 14px',
-                    borderRadius: 8,
-                    background: orderSentSuccess
-                      ? 'linear-gradient(135deg, #10b981, #059669)'
-                      : 'linear-gradient(135deg, #f59e0b, #d97706)',
-                    border: 'none',
-                    color: orderSentSuccess ? '#fff' : '#000',
-                    fontSize: 12,
-                    fontWeight: 900,
-                    cursor: customerCart.length === 0 ? 'not-allowed' : 'pointer',
-                    opacity: customerCart.length === 0 ? 0.5 : 1,
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 6,
-                  }}
-                >
-                  {orderSentSuccess ? (
-                    <>
-                      <Check size={14} />
-                      <span>{language === 'th' ? 'ส่งเข้า POS สำเร็จ!' : 'Sent to POS!'}</span>
-                    </>
-                  ) : (
-                    <>
-                      <span>{language === 'th' ? 'ส่งออเดอร์เข้าครัว' : 'Send to Kitchen'}</span>
-                      <ArrowRight size={14} />
-                    </>
-                  )}
-                </button>
-              </div>
-            </div>
-          )}
         </div>
 
-        {/* Modal Actions Footer */}
+        {/* Modal Actions Footer - Always Right-Aligned */}
         <div
           style={{
             padding: '12px 20px',
@@ -474,78 +306,51 @@ export const TableOrderQRModal: React.FC<TableOrderQRModalProps> = ({
             borderTop: '1px solid var(--color-border)',
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'space-between',
+            justifyContent: 'flex-end',
             gap: 10,
-            flexWrap: 'wrap',
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            {/* Copy Link Button */}
-            <button
-              onClick={handleCopyLink}
-              className="btn-secondary"
-              style={{ padding: '8px 12px', fontSize: 12, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 5 }}
-              title="Copy URL"
-            >
-              {copied ? <Check size={14} style={{ color: '#10b981' }} /> : <Copy size={14} />}
-              <span>{copied ? (language === 'th' ? 'คัดลอกแล้ว!' : 'Copied!') : (language === 'th' ? 'คัดลอกลิงก์' : 'Copy Link')}</span>
-            </button>
+          {/* Copy Link Button */}
+          <button
+            onClick={handleCopyLink}
+            className="btn-secondary"
+            style={{ padding: '8px 12px', fontSize: 12, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 5 }}
+            title="Copy URL"
+          >
+            {copied ? <Check size={14} style={{ color: '#10b981' }} /> : <Copy size={14} />}
+            <span>{copied ? (language === 'th' ? 'คัดลอกแล้ว!' : 'Copied!') : (language === 'th' ? 'คัดลอกลิงก์' : 'Copy Link')}</span>
+          </button>
 
-            {/* Customer Simulator Toggle Button */}
-            {!isSimulatingCustomer && (
-              <button
-                onClick={() => setIsSimulatingCustomer(true)}
-                style={{
-                  padding: '8px 12px',
-                  borderRadius: 'var(--radius-md)',
-                  background: 'rgba(59, 130, 246, 0.12)',
-                  border: '1px solid rgba(59, 130, 246, 0.3)',
-                  color: '#60a5fa',
-                  fontSize: 12,
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 5,
-                }}
-              >
-                <Smartphone size={14} />
-                <span>{language === 'th' ? 'ลองสแกนสั่งอาหาร' : 'Simulate Customer View'}</span>
-              </button>
-            )}
-          </div>
+          {/* Close Button */}
+          <button
+            onClick={onClose}
+            className="btn-secondary"
+            style={{ padding: '8px 14px', fontSize: 12, fontWeight: 700 }}
+          >
+            {language === 'th' ? 'ปิด' : 'Close'}
+          </button>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <button
-              onClick={onClose}
-              className="btn-secondary"
-              style={{ padding: '8px 14px', fontSize: 12, fontWeight: 700 }}
-            >
-              {language === 'th' ? 'ปิด' : 'Close'}
-            </button>
-
-            {/* Direct Thermal Slip Printer */}
-            <button
-              onClick={handlePrintQRSlip}
-              style={{
-                padding: '8px 18px',
-                borderRadius: 'var(--radius-md)',
-                background: 'linear-gradient(135deg, #f59e0b, #d97706)',
-                border: 'none',
-                color: '#000',
-                fontSize: 13,
-                fontWeight: 900,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 6,
-                boxShadow: '0 4px 14px rgba(245, 158, 11, 0.4)',
-              }}
-            >
-              <Printer size={16} />
-              <span>{language === 'th' ? 'พิมพ์สลิป QR (80mm)' : 'Print QR Slip'}</span>
-            </button>
-          </div>
+          {/* Direct Thermal Slip Printer Button */}
+          <button
+            onClick={handlePrintQRSlip}
+            style={{
+              padding: '8px 18px',
+              borderRadius: 'var(--radius-md)',
+              background: 'linear-gradient(135deg, #f59e0b, #d97706)',
+              border: 'none',
+              color: '#000',
+              fontSize: 13,
+              fontWeight: 900,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              boxShadow: '0 4px 14px rgba(245, 158, 11, 0.4)',
+            }}
+          >
+            <Printer size={16} />
+            <span>{language === 'th' ? 'พิมพ์สลิป QR (80mm)' : 'Print QR Slip'}</span>
+          </button>
         </div>
       </div>
     </div>
