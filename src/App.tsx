@@ -17,6 +17,7 @@ import {
   Bot,
   Key,
   Cpu,
+  Utensils,
 } from 'lucide-react';
 
 // Code-split secondary views to prioritize POS Master resources first
@@ -217,6 +218,18 @@ const POSContent: React.FC = () => {
                   <LayoutGrid size={16} />
                   <span>จัดการผังโต๊ะ</span>
                 </button>
+
+                <button
+                  onClick={() => {
+                    setAdminSubTab('menu');
+                    handleTabClick('admin');
+                  }}
+                  className={`nav-item ${activeTab === 'admin' && adminSubTab === 'menu' ? 'active' : ''}`}
+                >
+                  <Utensils size={16} />
+                  <span>จัดการเมนูอาหาร</span>
+                </button>
+
                 <button onClick={() => handleTabClick('kds')} className={`nav-item ${activeTab === 'kds' ? 'active' : ''}`} style={{ position: 'relative' }}>
                   <Flame size={16} />
                   <span>จอในครัว (KDS)</span>
