@@ -438,34 +438,20 @@ const POSContent: React.FC = () => {
           >
             A
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', lineHeight: 1.05 }}>
-            <span
-              style={{
-                fontSize: 15,
-                fontWeight: 900,
-                letterSpacing: '0.08em',
-                background: 'linear-gradient(135deg, #ffffff 40%, #f59e0b 100%)',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
-                whiteSpace: 'nowrap',
-                textTransform: 'uppercase',
-              }}
-            >
-              PROJECT ALBERTA
-            </span>
-            <span
-              style={{
-                fontSize: 8.5,
-                fontWeight: 700,
-                color: 'var(--color-primary)',
-                letterSpacing: '0.14em',
-                textTransform: 'uppercase',
-                opacity: 0.9,
-              }}
-            >
-              THAI SME POS
-            </span>
-          </div>
+          <span
+            style={{
+              fontSize: 15,
+              fontWeight: 900,
+              letterSpacing: '0.08em',
+              background: 'linear-gradient(135deg, #ffffff 40%, #f59e0b 100%)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              whiteSpace: 'nowrap',
+              textTransform: 'uppercase',
+            }}
+          >
+            PROJECT ALBERTA
+          </span>
         </div>
 
         {/* Right: Quick Shift Status + Staff Badge */}
