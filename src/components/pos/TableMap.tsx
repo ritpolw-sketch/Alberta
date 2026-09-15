@@ -245,21 +245,22 @@ export const TableMap: React.FC<TableMapProps> = ({ onSelectTable, compact = fal
         {/* Right: View Mode Toggle & Layout Manager Shortcut */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           {/* View Mode Switcher */}
-          <div style={{ display: 'flex', background: 'var(--color-bg-elevated)', padding: 2, borderRadius: 6, border: '1px solid var(--color-border)' }}>
+          <div style={{ display: 'flex', background: 'rgba(255, 255, 255, 0.04)', padding: 2, borderRadius: 6, border: '1px solid var(--color-border)' }}>
             <button
               onClick={() => setViewMode('canvas')}
               style={{
-                padding: compact ? '4px 8px' : '6px 12px',
+                padding: compact ? '4px 8px' : '5px 10px',
                 borderRadius: 4,
                 border: 'none',
-                background: viewMode === 'canvas' ? 'var(--color-primary)' : 'transparent',
-                color: viewMode === 'canvas' ? '#000' : 'var(--color-text-secondary)',
+                background: viewMode === 'canvas' ? 'rgba(245, 158, 11, 0.15)' : 'transparent',
+                color: viewMode === 'canvas' ? 'var(--color-primary)' : 'var(--color-text-secondary)',
                 fontSize: compact ? 11 : 12,
                 fontWeight: 700,
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 gap: 4,
+                transition: 'all 0.15s ease',
               }}
               title="Canvas view"
             >
@@ -269,17 +270,18 @@ export const TableMap: React.FC<TableMapProps> = ({ onSelectTable, compact = fal
             <button
               onClick={() => setViewMode('grid')}
               style={{
-                padding: compact ? '4px 8px' : '6px 12px',
+                padding: compact ? '4px 8px' : '5px 10px',
                 borderRadius: 4,
                 border: 'none',
-                background: viewMode === 'grid' ? 'var(--color-primary)' : 'transparent',
-                color: viewMode === 'grid' ? '#000' : 'var(--color-text-secondary)',
+                background: viewMode === 'grid' ? 'rgba(245, 158, 11, 0.15)' : 'transparent',
+                color: viewMode === 'grid' ? 'var(--color-primary)' : 'var(--color-text-secondary)',
                 fontSize: compact ? 11 : 12,
                 fontWeight: 700,
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 gap: 4,
+                transition: 'all 0.15s ease',
               }}
               title="List view"
             >

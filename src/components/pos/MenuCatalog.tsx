@@ -211,34 +211,32 @@ export const MenuCatalog: React.FC<MenuCatalogProps> = ({ onSelectItem }) => {
       <div
         style={{
           display: 'flex',
-          gap: 12,
+          gap: 8,
           overflowX: 'auto',
-          padding: '12px 16px',
+          padding: '10px 14px',
           background: 'var(--color-bg-card)',
           borderTop: '1px solid var(--color-border)',
-          boxShadow: '0 -4px 12px rgba(0,0,0,0.2)',
         }}
       >
         <button
           onClick={() => setActiveCategory('all')}
           style={{
-            padding: '10px 20px',
-            borderRadius: 'var(--radius-lg)',
+            padding: '8px 16px',
+            borderRadius: 'var(--radius-sm)',
             border: '1px solid ' + (activeCategory === 'all' ? 'var(--color-primary)' : 'var(--color-border)'),
-            background: activeCategory === 'all' ? 'var(--color-primary)' : 'var(--color-bg-elevated)',
-            color: activeCategory === 'all' ? '#000' : 'var(--color-text-secondary)',
-            fontSize: 14,
+            background: activeCategory === 'all' ? 'rgba(245, 158, 11, 0.15)' : 'rgba(255, 255, 255, 0.04)',
+            color: activeCategory === 'all' ? 'var(--color-primary)' : 'var(--color-text-secondary)',
+            fontSize: 13,
             fontWeight: 700,
             cursor: 'pointer',
             whiteSpace: 'nowrap',
-            transition: 'all 0.15s',
+            transition: 'all 0.15s ease',
             display: 'flex',
-            flexDirection: 'column',
             alignItems: 'center',
-            gap: 4,
+            gap: 6,
           }}
         >
-          <span style={{ fontSize: 18 }}>🍽️</span>
+          <span>🍽️</span>
           <span>{language === 'th' ? 'ทุกเมนู' : 'All'}</span>
         </button>
 
@@ -247,23 +245,22 @@ export const MenuCatalog: React.FC<MenuCatalogProps> = ({ onSelectItem }) => {
             key={cat.id}
             onClick={() => setActiveCategory(cat.id)}
             style={{
-              padding: '10px 20px',
-              borderRadius: 'var(--radius-lg)',
+              padding: '8px 16px',
+              borderRadius: 'var(--radius-sm)',
               border: '1px solid ' + (activeCategory === cat.id ? 'var(--color-primary)' : 'var(--color-border)'),
-              background: activeCategory === cat.id ? 'var(--color-primary)' : 'var(--color-bg-elevated)',
-              color: activeCategory === cat.id ? '#000' : 'var(--color-text-secondary)',
-              fontSize: 14,
+              background: activeCategory === cat.id ? 'rgba(245, 158, 11, 0.15)' : 'rgba(255, 255, 255, 0.04)',
+              color: activeCategory === cat.id ? 'var(--color-primary)' : 'var(--color-text-secondary)',
+              fontSize: 13,
               fontWeight: 700,
               cursor: 'pointer',
               whiteSpace: 'nowrap',
-              transition: 'all 0.15s',
+              transition: 'all 0.15s ease',
               display: 'flex',
-              flexDirection: 'column',
               alignItems: 'center',
-              gap: 4,
+              gap: 6,
             }}
           >
-            <span style={{ fontSize: 18 }}>{cat.icon}</span>
+            <span>{cat.icon}</span>
             <span>{language === 'th' ? cat.nameTh : cat.nameEn}</span>
           </button>
         ))}

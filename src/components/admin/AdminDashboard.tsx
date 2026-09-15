@@ -197,9 +197,9 @@ export const AdminDashboard: React.FC = () => {
               {/* Gross Sales */}
               <div
                 style={{
-                  background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.12), rgba(217, 119, 6, 0.04))',
-                  border: '1px solid rgba(245, 158, 11, 0.3)',
-                  borderRadius: 'var(--radius-lg)',
+                  background: 'var(--color-bg-card)',
+                  border: '1px solid var(--color-border)',
+                  borderRadius: 'var(--radius-md)',
                   padding: 20,
                   display: 'flex',
                   flexDirection: 'column',
@@ -210,11 +210,11 @@ export const AdminDashboard: React.FC = () => {
                   <span style={{ fontSize: 13, color: 'var(--color-text-secondary)', fontWeight: 600 }}>
                     {language === 'th' ? 'ยอดขายรวมวันนี้ (Gross Sales)' : 'Gross Sales Today'}
                   </span>
-                  <div style={{ padding: 6, borderRadius: 8, background: 'rgba(245, 158, 11, 0.2)', color: 'var(--color-primary)' }}>
+                  <div style={{ padding: 6, borderRadius: 8, background: 'rgba(245, 158, 11, 0.15)', color: 'var(--color-primary)' }}>
                     <DollarSign size={18} />
                   </div>
                 </div>
-                <div style={{ fontSize: 28, fontWeight: 800, color: '#fff', fontFamily: 'var(--font-mono)' }}>
+                <div style={{ fontSize: 28, fontWeight: 800, color: 'var(--color-primary)', fontFamily: 'var(--font-mono)' }}>
                   ฿{grossSales.toLocaleString()}
                 </div>
                 <div style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>
@@ -225,9 +225,9 @@ export const AdminDashboard: React.FC = () => {
               {/* PromptPay Sales */}
               <div
                 style={{
-                  background: 'rgba(59, 130, 246, 0.08)',
-                  border: '1px solid rgba(59, 130, 246, 0.25)',
-                  borderRadius: 'var(--radius-lg)',
+                  background: 'var(--color-bg-card)',
+                  border: '1px solid var(--color-border)',
+                  borderRadius: 'var(--radius-md)',
                   padding: 20,
                   display: 'flex',
                   flexDirection: 'column',
@@ -238,11 +238,11 @@ export const AdminDashboard: React.FC = () => {
                   <span style={{ fontSize: 13, color: 'var(--color-text-secondary)', fontWeight: 600 }}>
                     PromptPay QR
                   </span>
-                  <div style={{ padding: 6, borderRadius: 8, background: 'rgba(59, 130, 246, 0.2)', color: '#60a5fa' }}>
+                  <div style={{ padding: 6, borderRadius: 8, background: 'rgba(255, 255, 255, 0.06)', color: '#fff' }}>
                     <QrCode size={18} />
                   </div>
                 </div>
-                <div style={{ fontSize: 28, fontWeight: 800, color: '#60a5fa', fontFamily: 'var(--font-mono)' }}>
+                <div style={{ fontSize: 28, fontWeight: 800, color: '#fff', fontFamily: 'var(--font-mono)' }}>
                   ฿{currentShift.promptpaySales.toLocaleString()}
                 </div>
                 <div style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>
@@ -253,9 +253,9 @@ export const AdminDashboard: React.FC = () => {
               {/* Cash Sales */}
               <div
                 style={{
-                  background: 'rgba(16, 185, 129, 0.08)',
-                  border: '1px solid rgba(16, 185, 129, 0.25)',
-                  borderRadius: 'var(--radius-lg)',
+                  background: 'var(--color-bg-card)',
+                  border: '1px solid var(--color-border)',
+                  borderRadius: 'var(--radius-md)',
                   padding: 20,
                   display: 'flex',
                   flexDirection: 'column',
@@ -266,11 +266,11 @@ export const AdminDashboard: React.FC = () => {
                   <span style={{ fontSize: 13, color: 'var(--color-text-secondary)', fontWeight: 600 }}>
                     {language === 'th' ? 'เงินสด (Cash)' : 'Cash in Hand'}
                   </span>
-                  <div style={{ padding: 6, borderRadius: 8, background: 'rgba(16, 185, 129, 0.2)', color: '#34d399' }}>
+                  <div style={{ padding: 6, borderRadius: 8, background: 'rgba(255, 255, 255, 0.06)', color: '#fff' }}>
                     <Banknote size={18} />
                   </div>
                 </div>
-                <div style={{ fontSize: 28, fontWeight: 800, color: '#34d399', fontFamily: 'var(--font-mono)' }}>
+                <div style={{ fontSize: 28, fontWeight: 800, color: '#fff', fontFamily: 'var(--font-mono)' }}>
                   ฿{currentShift.cashSales.toLocaleString()}
                 </div>
                 <div style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>
@@ -281,9 +281,9 @@ export const AdminDashboard: React.FC = () => {
               {/* Average Bill Size */}
               <div
                 style={{
-                  background: 'rgba(236, 72, 153, 0.08)',
-                  border: '1px solid rgba(236, 72, 153, 0.25)',
-                  borderRadius: 'var(--radius-lg)',
+                  background: 'var(--color-bg-card)',
+                  border: '1px solid var(--color-border)',
+                  borderRadius: 'var(--radius-md)',
                   padding: 20,
                   display: 'flex',
                   flexDirection: 'column',
@@ -294,11 +294,11 @@ export const AdminDashboard: React.FC = () => {
                   <span style={{ fontSize: 13, color: 'var(--color-text-secondary)', fontWeight: 600 }}>
                     {language === 'th' ? 'ยอดเฉลี่ยต่อบิล' : 'Average Ticket Size'}
                   </span>
-                  <div style={{ padding: 6, borderRadius: 8, background: 'rgba(236, 72, 153, 0.2)', color: '#f472b6' }}>
+                  <div style={{ padding: 6, borderRadius: 8, background: 'rgba(255, 255, 255, 0.06)', color: '#fff' }}>
                     <ShoppingBag size={18} />
                   </div>
                 </div>
-                <div style={{ fontSize: 28, fontWeight: 800, color: '#f472b6', fontFamily: 'var(--font-mono)' }}>
+                <div style={{ fontSize: 28, fontWeight: 800, color: '#fff', fontFamily: 'var(--font-mono)' }}>
                   ฿{avgBillSize.toLocaleString()}
                 </div>
                 <div style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>

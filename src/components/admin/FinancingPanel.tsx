@@ -109,13 +109,8 @@ export const FinancingPanel: React.FC = () => {
                   setTxType('pay_out');
                   setShowPayInOut(true);
                 }}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 6,
-                  padding: '10px 16px', borderRadius: 10,
-                  background: 'rgba(239, 68, 68, 0.12)',
-                  border: '1px solid rgba(239, 68, 68, 0.3)',
-                  color: '#ef4444', fontWeight: 700, fontSize: 12, cursor: 'pointer',
-                }}
+                className="btn-secondary"
+                style={{ fontSize: 12, padding: '8px 14px' }}
               >
                 <ArrowUpCircle size={14} /> จ่ายออก (Pay-Out)
               </button>
@@ -124,13 +119,8 @@ export const FinancingPanel: React.FC = () => {
                   setTxType('pay_in');
                   setShowPayInOut(true);
                 }}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 6,
-                  padding: '10px 16px', borderRadius: 10,
-                  background: 'rgba(16, 185, 129, 0.12)',
-                  border: '1px solid rgba(16, 185, 129, 0.3)',
-                  color: '#10b981', fontWeight: 700, fontSize: 12, cursor: 'pointer',
-                }}
+                className="btn-secondary"
+                style={{ fontSize: 12, padding: '8px 14px' }}
               >
                 <ArrowDownCircle size={14} /> รับเข้า (Pay-In)
               </button>
@@ -142,17 +132,17 @@ export const FinancingPanel: React.FC = () => {
       {/* Shift KPIs */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 14 }}>
         {/* Opening Float */}
-        <div style={{ ...kpiCardStyle, borderColor: 'rgba(59, 130, 246, 0.3)', background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.08), transparent)' }}>
+        <div style={kpiCardStyle}>
           <div style={{ fontSize: 11, color: 'var(--color-text-muted)', fontWeight: 600, marginBottom: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
             <Wallet size={12} /> เงินทอนตั้งต้น
           </div>
-          <div style={{ fontSize: 22, fontWeight: 800, color: '#3b82f6', fontFamily: 'var(--font-mono)' }}>
+          <div style={{ fontSize: 22, fontWeight: 800, color: '#fff', fontFamily: 'var(--font-mono)' }}>
             {formatCurrency(currentShift.openingFloat)}
           </div>
         </div>
 
         {/* Gross Sales */}
-        <div style={{ ...kpiCardStyle, borderColor: 'rgba(245, 158, 11, 0.3)', background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.08), transparent)' }}>
+        <div style={kpiCardStyle}>
           <div style={{ fontSize: 11, color: 'var(--color-text-muted)', fontWeight: 600, marginBottom: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
             <TrendingUp size={12} /> ยอดขายรวม
           </div>
@@ -162,28 +152,24 @@ export const FinancingPanel: React.FC = () => {
         </div>
 
         {/* Expected Cash */}
-        <div style={{ ...kpiCardStyle, borderColor: 'rgba(16, 185, 129, 0.3)', background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.08), transparent)' }}>
+        <div style={kpiCardStyle}>
           <div style={{ fontSize: 11, color: 'var(--color-text-muted)', fontWeight: 600, marginBottom: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
             <DollarSign size={12} /> เงินสดที่ควรมี
           </div>
-          <div style={{ fontSize: 22, fontWeight: 800, color: '#10b981', fontFamily: 'var(--font-mono)' }}>
+          <div style={{ fontSize: 22, fontWeight: 800, color: '#fff', fontFamily: 'var(--font-mono)' }}>
             {formatCurrency(currentShift.expectedCash)}
           </div>
         </div>
 
         {/* Discrepancy (if closed) */}
         {!isShiftOpen && currentShift.discrepancy != null && (
-          <div style={{
-            ...kpiCardStyle,
-            borderColor: currentShift.discrepancy === 0 ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)',
-            background: currentShift.discrepancy === 0 ? 'linear-gradient(135deg, rgba(16, 185, 129, 0.08), transparent)' : 'linear-gradient(135deg, rgba(239, 68, 68, 0.08), transparent)',
-          }}>
+          <div style={kpiCardStyle}>
             <div style={{ fontSize: 11, color: 'var(--color-text-muted)', fontWeight: 600, marginBottom: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
               <AlertTriangle size={12} /> เงินขาด/เงินเกิน
             </div>
             <div style={{
               fontSize: 22, fontWeight: 800, fontFamily: 'var(--font-mono)',
-              color: currentShift.discrepancy === 0 ? '#10b981' : currentShift.discrepancy > 0 ? '#3b82f6' : '#ef4444',
+              color: currentShift.discrepancy === 0 ? 'var(--color-primary)' : currentShift.discrepancy > 0 ? '#60a5fa' : '#ef4444',
             }}>
               {currentShift.discrepancy > 0 ? '+' : ''}{formatCurrency(currentShift.discrepancy)}
             </div>
@@ -204,37 +190,37 @@ export const FinancingPanel: React.FC = () => {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
           <div style={{
             padding: 14, borderRadius: 10,
-            background: 'rgba(16, 185, 129, 0.08)',
-            border: '1px solid rgba(16, 185, 129, 0.2)',
+            background: 'var(--color-bg-elevated)',
+            border: '1px solid var(--color-border)',
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#10b981', fontWeight: 600, marginBottom: 6 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--color-text-secondary)', fontWeight: 600, marginBottom: 6 }}>
               <Banknote size={14} /> เงินสด
             </div>
-            <div style={{ fontSize: 18, fontWeight: 800, color: '#10b981', fontFamily: 'var(--font-mono)' }}>
+            <div style={{ fontSize: 18, fontWeight: 800, color: '#fff', fontFamily: 'var(--font-mono)' }}>
               {formatCurrency(currentShift.cashSales)}
             </div>
           </div>
           <div style={{
             padding: 14, borderRadius: 10,
-            background: 'rgba(59, 130, 246, 0.08)',
-            border: '1px solid rgba(59, 130, 246, 0.2)',
+            background: 'var(--color-bg-elevated)',
+            border: '1px solid var(--color-border)',
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#3b82f6', fontWeight: 600, marginBottom: 6 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--color-text-secondary)', fontWeight: 600, marginBottom: 6 }}>
               <QrCode size={14} /> PromptPay
             </div>
-            <div style={{ fontSize: 18, fontWeight: 800, color: '#3b82f6', fontFamily: 'var(--font-mono)' }}>
+            <div style={{ fontSize: 18, fontWeight: 800, color: '#fff', fontFamily: 'var(--font-mono)' }}>
               {formatCurrency(currentShift.promptpaySales)}
             </div>
           </div>
           <div style={{
             padding: 14, borderRadius: 10,
-            background: 'rgba(139, 92, 246, 0.08)',
-            border: '1px solid rgba(139, 92, 246, 0.2)',
+            background: 'var(--color-bg-elevated)',
+            border: '1px solid var(--color-border)',
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#8b5cf6', fontWeight: 600, marginBottom: 6 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--color-text-secondary)', fontWeight: 600, marginBottom: 6 }}>
               <CreditCard size={14} /> บัตรเครดิต
             </div>
-            <div style={{ fontSize: 18, fontWeight: 800, color: '#8b5cf6', fontFamily: 'var(--font-mono)' }}>
+            <div style={{ fontSize: 18, fontWeight: 800, color: '#fff', fontFamily: 'var(--font-mono)' }}>
               {formatCurrency(currentShift.cardSales)}
             </div>
           </div>

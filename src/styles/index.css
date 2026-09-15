@@ -7,20 +7,20 @@
   --color-bg-card: #111827;
   --color-bg-elevated: #1e293b;
   --color-bg-subtle: #0f172a;
-  
+
   --color-border: #1e293b;
   --color-border-glow: rgba(245, 158, 11, 0.25);
-  
+
   --color-primary: #f59e0b;
   --color-primary-hover: #d97706;
   --color-primary-glow: rgba(245, 158, 11, 0.35);
-  
+
   --color-emerald: #10b981;
   --color-emerald-glow: rgba(16, 185, 129, 0.3);
-  
+
   --color-chili: #ef4444;
   --color-chili-glow: rgba(239, 68, 68, 0.3);
-  
+
   --color-blue: #3b82f6;
   --color-indigo: #6366f1;
 
@@ -64,7 +64,10 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-input, button, textarea, select {
+input,
+button,
+textarea,
+select {
   font-family: inherit;
 }
 
@@ -102,18 +105,39 @@ input, button, textarea, select {
 
 /* Animations */
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(6px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @keyframes pulseGlow {
-  0%, 100% { box-shadow: 0 0 15px rgba(245, 158, 11, 0.2); }
-  50% { box-shadow: 0 0 25px rgba(245, 158, 11, 0.45); }
+
+  0%,
+  100% {
+    box-shadow: 0 0 15px rgba(245, 158, 11, 0.2);
+  }
+
+  50% {
+    box-shadow: 0 0 25px rgba(245, 158, 11, 0.45);
+  }
 }
 
 @keyframes scaleIn {
-  from { opacity: 0; transform: scale(0.96); }
-  to { opacity: 1; transform: scale(1); }
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 /* Layout Utilities */
@@ -123,8 +147,8 @@ input, button, textarea, select {
   height: 100vh;
   overflow: hidden;
   background: radial-gradient(circle at 10% 20%, rgba(245, 158, 11, 0.04) 0%, transparent 40%),
-              radial-gradient(circle at 90% 80%, rgba(16, 185, 129, 0.04) 0%, transparent 40%),
-              var(--color-bg-main);
+    radial-gradient(circle at 90% 80%, rgba(16, 185, 129, 0.04) 0%, transparent 40%),
+    var(--color-bg-main);
 }
 
 .app-layout-sidebar {
@@ -329,9 +353,11 @@ input, button, textarea, select {
   .app-layout-sidebar {
     flex-direction: column;
   }
+
   .mobile-header {
     display: flex;
   }
+
   .app-sidebar {
     position: fixed;
     top: 0;
@@ -339,12 +365,15 @@ input, button, textarea, select {
     bottom: 0;
     transform: translateX(-100%);
   }
+
   .app-sidebar.open {
     transform: translateX(0);
   }
+
   .mobile-close-btn {
     display: block;
   }
+
   .sidebar-overlay {
     display: block;
   }
@@ -495,10 +524,21 @@ input, button, textarea, select {
   height: 4px;
 }
 
-.table-card.status-open::before { background: var(--status-open); }
-.table-card.status-occupied::before { background: var(--status-occupied); }
-.table-card.status-ordered::before { background: var(--status-ordered); }
-.table-card.status-bill_requested::before { background: var(--status-bill); }
+.table-card.status-open::before {
+  background: var(--status-open);
+}
+
+.table-card.status-occupied::before {
+  background: var(--status-occupied);
+}
+
+.table-card.status-ordered::before {
+  background: var(--status-ordered);
+}
+
+.table-card.status-bill_requested::before {
+  background: var(--status-bill);
+}
 
 .table-header-row {
   display: flex;
