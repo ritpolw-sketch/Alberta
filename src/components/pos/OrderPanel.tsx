@@ -13,7 +13,7 @@ import {
 import confetti from 'canvas-confetti';
 import { MenuCatalog } from './MenuCatalog';
 import { TableOrderQRModal } from './TableOrderQRModal';
-import type { MenuItem, Order, RestaurantSettings } from '../../types/pos';
+import type { MenuItem, Order, RestaurantSettings, Table } from '../../types/pos';
 
 interface OrderPanelProps {
   hideMenuToggle?: boolean;
@@ -52,6 +52,12 @@ export const OrderPanel: React.FC<OrderPanelProps> = ({ hideMenuToggle = false }
   const handleDirectPrintReceipt = () => {
     if (!activeOrder) return;
     triggerDirectPrint(activeOrder, settings, currentStaff?.name || 'Cashier');
+  };
+
+  // Direct print QR Code thermal slip right away (no modal needed)
+  const handleDirectPrintQR = () => {
+    if (!activeTable) return;
+    triggerDirectPrintQRSlip(activeTable, settings);
   };
 
   // 1-Click Pay via Transfer (โอนเงิน)
@@ -500,7 +506,7 @@ export const OrderPanel: React.FC<OrderPanelProps> = ({ hideMenuToggle = false }
               {/* Quick Actions Row: QR สั่งอาหาร & ล้างบิล */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <button
-                  onClick={() => setIsQRModalOpen(true)}
+                  onClick={handleDirectPrintQR}
                   style={{
                     flex: 1,
                     padding: '7px 10px',
@@ -523,10 +529,10 @@ export const OrderPanel: React.FC<OrderPanelProps> = ({ hideMenuToggle = false }
                   onMouseLeave={(e) => {
                     e.currentTarget.style.background = 'linear-gradient(135deg, rgba(245, 158, 11, 0.2), rgba(217, 119, 6, 0.1))';
                   }}
-                  title={language === 'th' ? 'พิมพ์ QR Code สั่งอาหารให้ลูกค้าสแกนสั่งเอง' : 'Print Customer Order QR'}
+                  title={language === 'th' ? 'พิมพ์ QR Code สั่งอาหารให้ลูกค้าสแกนสั่งเองทันที (ไม่มี Modal)' : 'Print Customer Order QR'}
                 >
-                  <QrCode size={14} />
-                  <span>{language === 'th' ? 'QR สั่งอาหาร' : 'Order QR'}</span>
+                  <Printer size={14} />
+                  <span>{language === 'th' ? 'พิมพ์ QR สั่งอาหาร' : 'Print Order QR'}</span>
                 </button>
 
                 {activeOrder && items.length > 0 && (
@@ -1180,6 +1186,101 @@ function triggerDirectPrint(order: Order, restSettings: RestaurantSettings, staf
   if (doc) {
     doc.open();
     doc.write(content);
+    doc.close();
+    setTimeout(() => {
+      iframe.contentWindow?.focus();
+      iframe.contentWindow?.print();
+      setTimeout(() => {
+        if (document.body.contains(iframe)) {
+          document.body.removeChild(iframe);
+        }
+      }, 2000);
+    }, 250);
+  } else {
+    window.print();
+  }
+}
+
+function triggerDirectPrintQRSlip(table: Table, settings: RestaurantSettings) {
+  const origin = window.location.origin;
+  const sessionCode = `SESSION-${table.id}-${Date.now().toString().slice(-4)}`;
+  const orderUrl = `${origin}/customer-order?table=${table.id}&number=${table.number}&session=${sessionCode}`;
+  const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(orderUrl)}`;
+
+  const iframe = document.createElement('iframe');
+  iframe.style.position = 'fixed';
+  iframe.style.right = '0';
+  iframe.style.bottom = '0';
+  iframe.style.width = '0';
+  iframe.style.height = '0';
+  iframe.style.border = '0';
+  document.body.appendChild(iframe);
+
+  const printContent = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <title>Order QR Slip - Table ${table.number}</title>
+        <style>
+          @page { margin: 0; size: 80mm auto; }
+          body {
+            font-family: 'Prompt', 'Courier New', monospace;
+            width: 72mm;
+            margin: 0 auto;
+            padding: 8px 4px;
+            color: #000;
+            background: #fff;
+            font-size: 11px;
+          }
+          .text-center { text-align: center; }
+          .bold { font-weight: 800; }
+          .table-badge {
+            font-size: 24px;
+            font-weight: 900;
+            margin: 8px 0;
+            padding: 6px;
+            border: 2px solid #000;
+            display: inline-block;
+          }
+          .qr-img {
+            width: 180px;
+            height: 180px;
+            margin: 8px auto;
+            display: block;
+          }
+          .divider { border-bottom: 1px dashed #000; margin: 8px 0; }
+          .instructions { font-size: 10px; line-height: 1.4; text-align: center; margin: 6px 0; }
+          .wifi-box { font-size: 10px; border: 1px dotted #000; padding: 4px; margin-top: 6px; }
+        </style>
+      </head>
+      <body>
+        <div class="text-center">
+          <div class="bold" style="font-size: 14px;">${settings.restaurantNameTh}</div>
+          <div style="font-size: 10px;">${settings.restaurantNameEn || 'Project Alberta'} • ${settings.branchName || 'Main'}</div>
+          <div class="table-badge">โต๊ะ ${table.number}</div>
+          <div class="bold">สแกนเพื่อดูเมนูและสั่งอาหาร</div>
+          <img class="qr-img" src="${qrApiUrl}" alt="Order QR Code" />
+          <div class="instructions">
+            1. เปิดกล้องถ่ายรูป หรือ LINE บนมือถือ<br/>
+            2. สแกน QR Code เพื่อดูเมนูอาหาร<br/>
+            3. เลือกอาหารและกดส่งรายการเข้าครัวได้ทันที
+          </div>
+          <div class="divider"></div>
+          <div class="wifi-box">
+            📶 Free WiFi: <strong>Alberta_Guest</strong> | Pass: <strong>alberta888</strong>
+          </div>
+          <div style="font-size: 9px; margin-top: 6px; color: #555;">
+            พิมพ์เมื่อ: ${new Date().toLocaleDateString('th-TH')} ${new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })}
+          </div>
+        </div>
+      </body>
+    </html>
+  `;
+
+  const doc = iframe.contentWindow?.document;
+  if (doc) {
+    doc.open();
+    doc.write(printContent);
     doc.close();
     setTimeout(() => {
       iframe.contentWindow?.focus();
