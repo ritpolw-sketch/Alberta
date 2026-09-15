@@ -12,11 +12,45 @@ import {
   AlertTriangle,
   ChevronDown,
   ChevronUp,
+  ChevronLeft,
+  ChevronRight,
   Receipt,
   Clock,
+  Printer,
+  Calendar,
+  TrendingUp,
+  Hash,
+  PieChart,
 } from 'lucide-react';
 import type { Order, PaymentMethod } from '../../types/pos';
 
+// ─── Date Utilities ────────────────────────────────
+const toDateKey = (iso: string): string => {
+  const d = new Date(iso);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+
+const toThaiDate = (dateStr: string): string => {
+  const d = new Date(dateStr + 'T00:00:00');
+  return d.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' });
+};
+
+const toThaiDateLong = (dateStr: string): string => {
+  const d = new Date(dateStr + 'T00:00:00');
+  return d.toLocaleDateString('th-TH', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+};
+
+const todayKey = (): string => toDateKey(new Date().toISOString());
+
+const shiftDate = (dateStr: string, delta: number): string => {
+  const d = new Date(dateStr + 'T00:00:00');
+  d.setDate(d.getDate() + delta);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+
+const formatDateInput = (dateStr: string): string => dateStr; // yyyy-MM-dd for <input type="date">
+
+// ─── Component ─────────────────────────────────────
 export const BillLogs: React.FC = () => {
   const {
     completedOrders,
@@ -25,6 +59,12 @@ export const BillLogs: React.FC = () => {
     staffUsers,
   } = usePOS();
 
+  // Date navigation state
+  const [dateFrom, setDateFrom] = useState<string>(todayKey());
+  const [dateTo, setDateTo] = useState<string>(todayKey());
+  const [isRangeMode, setIsRangeMode] = useState(false);
+
+  // Filter states
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | 'completed' | 'voided'>('all');
   const [filterMethod, setFilterMethod] = useState<'all' | PaymentMethod>('all');
@@ -36,9 +76,15 @@ export const BillLogs: React.FC = () => {
   const [voidError, setVoidError] = useState('');
   const [showFilters, setShowFilters] = useState(false);
 
-  // All completed/voided orders sorted by date desc
-  const allBills = useMemo(() => {
+  // ─── Derived Data ──────────────────────────────
+  const filteredBills = useMemo(() => {
     let bills = [...completedOrders];
+
+    // Date filter
+    bills = bills.filter((b) => {
+      const key = toDateKey(b.updatedAt);
+      return key >= dateFrom && key <= dateTo;
+    });
 
     // Search filter
     if (searchQuery) {
@@ -65,16 +111,84 @@ export const BillLogs: React.FC = () => {
     // Sort newest first
     bills.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
     return bills;
-  }, [completedOrders, searchQuery, filterStatus, filterMethod]);
+  }, [completedOrders, dateFrom, dateTo, searchQuery, filterStatus, filterMethod]);
 
-  const formatDate = (iso: string) => {
-    const d = new Date(iso);
-    return d.toLocaleDateString('th-TH', { day: '2-digit', month: 'short', year: 'numeric' });
+  // Group bills by date
+  const groupedBills = useMemo(() => {
+    const groups: { dateKey: string; bills: Order[] }[] = [];
+    const map = new Map<string, Order[]>();
+
+    for (const bill of filteredBills) {
+      const key = toDateKey(bill.updatedAt);
+      if (!map.has(key)) {
+        map.set(key, []);
+      }
+      map.get(key)!.push(bill);
+    }
+
+    // Sort groups by date desc
+    const sortedKeys = Array.from(map.keys()).sort((a, b) => b.localeCompare(a));
+    for (const key of sortedKeys) {
+      groups.push({ dateKey: key, bills: map.get(key)! });
+    }
+    return groups;
+  }, [filteredBills]);
+
+  // Daily KPI stats for the visible filtered bills
+  const dailyStats = useMemo(() => {
+    const completedBills = filteredBills.filter((b) => b.status === 'completed');
+    const totalSales = completedBills.reduce((sum, b) => sum + b.grandTotal, 0);
+    const billCount = filteredBills.length;
+    const completedCount = completedBills.length;
+    const voidedCount = filteredBills.filter((b) => b.status === 'voided').length;
+    const avgTicket = completedCount > 0 ? Math.round(totalSales / completedCount) : 0;
+
+    const cashSales = completedBills.filter((b) => b.payment?.method === 'cash').reduce((sum, b) => sum + b.grandTotal, 0);
+    const promptpaySales = completedBills.filter((b) => b.payment?.method === 'promptpay').reduce((sum, b) => sum + b.grandTotal, 0);
+    const cardSales = completedBills.filter((b) => b.payment?.method === 'card').reduce((sum, b) => sum + b.grandTotal, 0);
+
+    return { totalSales, billCount, completedCount, voidedCount, avgTicket, cashSales, promptpaySales, cardSales };
+  }, [filteredBills]);
+
+  const isSingleDay = dateFrom === dateTo;
+  const isToday = dateFrom === todayKey() && dateTo === todayKey();
+
+  // ─── Handlers ──────────────────────────────────
+  const handleToday = () => {
+    setDateFrom(todayKey());
+    setDateTo(todayKey());
+    setIsRangeMode(false);
+  };
+
+  const handlePrevDay = () => {
+    if (isSingleDay) {
+      const prev = shiftDate(dateFrom, -1);
+      setDateFrom(prev);
+      setDateTo(prev);
+    } else {
+      setDateFrom(shiftDate(dateFrom, -1));
+    }
+  };
+
+  const handleNextDay = () => {
+    const next = shiftDate(isSingleDay ? dateFrom : dateTo, 1);
+    if (next > todayKey()) return; // Can't go to future
+    if (isSingleDay) {
+      setDateFrom(next);
+      setDateTo(next);
+    } else {
+      setDateTo(next);
+    }
   };
 
   const formatTime = (iso: string) => {
     const d = new Date(iso);
     return d.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
+  };
+
+  const formatDate = (iso: string) => {
+    const d = new Date(iso);
+    return d.toLocaleDateString('th-TH', { day: '2-digit', month: 'short', year: 'numeric' });
   };
 
   const getPaymentMethodLabel = (method?: PaymentMethod) => {
@@ -99,7 +213,6 @@ export const BillLogs: React.FC = () => {
       setVoidError('กรุณาระบุเหตุผลในการยกเลิก');
       return;
     }
-    // Verify PIN for owner/manager
     const staff = staffUsers.find((s) => s.pin === voidPin);
     if (!staff || (staff.role !== 'owner' && staff.role !== 'admin' && staff.role !== 'manager')) {
       setVoidError('PIN ไม่ถูกต้อง หรือไม่มีสิทธิ์ (ต้องเป็น Owner/Manager)');
@@ -110,6 +223,12 @@ export const BillLogs: React.FC = () => {
     setSelectedBill(null);
   };
 
+  const handleReprintReceipt = (bill: Order) => {
+    // Open receipt modal for reprint
+    setSelectedBill(bill);
+  };
+
+  // ─── Styles ────────────────────────────────────
   const cardStyle: React.CSSProperties = {
     background: 'var(--color-bg-card)',
     border: '1px solid var(--color-border)',
@@ -138,27 +257,309 @@ export const BillLogs: React.FC = () => {
     verticalAlign: 'middle',
   };
 
+  const kpiCardStyle: React.CSSProperties = {
+    background: 'var(--color-bg-card)',
+    border: '1px solid var(--color-border)',
+    borderRadius: 14,
+    padding: '18px 20px',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 6,
+    transition: 'all 0.2s',
+  };
+
+  const iconBoxStyle = (color: string): React.CSSProperties => ({
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    background: `${color}15`,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    color,
+  });
+
+  // ─── Render ────────────────────────────────────
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-      {/* Header */}
+      {/* ── Header ── */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
           <h3 style={{ fontSize: 18, fontWeight: 800, color: '#fff', margin: 0 }}>
             🧾 {language === 'th' ? 'ประวัติบิลทั้งหมด' : 'All Bill Logs'}
           </h3>
           <p style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginTop: 2 }}>
-            {allBills.length} {language === 'th' ? 'รายการ' : 'records'}
+            {language === 'th' ? 'จัดการบิลรายวัน ดูประวัติย้อนหลัง' : 'Daily bill management & history'}
           </p>
         </div>
       </div>
 
-      {/* Search & Filters */}
+      {/* ── Date Navigation Strip ── */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          padding: '12px 16px',
+          background: 'var(--color-bg-card)',
+          border: '1px solid var(--color-border)',
+          borderRadius: 12,
+          flexWrap: 'wrap',
+        }}
+      >
+        {/* Today Button */}
+        <button
+          onClick={handleToday}
+          style={{
+            padding: '7px 16px',
+            borderRadius: 8,
+            border: isToday ? '1px solid rgba(245, 158, 11, 0.4)' : '1px solid var(--color-border)',
+            background: isToday ? 'rgba(245, 158, 11, 0.15)' : 'var(--color-bg-elevated)',
+            color: isToday ? 'var(--color-primary)' : 'var(--color-text-secondary)',
+            fontSize: 13,
+            fontWeight: 700,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            transition: 'all 0.15s',
+          }}
+        >
+          <Calendar size={14} />
+          วันนี้
+        </button>
+
+        {/* Divider */}
+        <div style={{ width: 1, height: 28, background: 'rgba(255,255,255,0.08)' }} />
+
+        {/* Prev Day */}
+        <button
+          onClick={handlePrevDay}
+          style={{
+            width: 32, height: 32, borderRadius: 8,
+            border: '1px solid var(--color-border)',
+            background: 'var(--color-bg-elevated)',
+            color: 'var(--color-text-secondary)',
+            cursor: 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            transition: 'all 0.15s',
+          }}
+        >
+          <ChevronLeft size={16} />
+        </button>
+
+        {/* Date Display / Picker */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ position: 'relative' }}>
+            <input
+              type="date"
+              value={formatDateInput(dateFrom)}
+              max={todayKey()}
+              onChange={(e) => {
+                const val = e.target.value;
+                setDateFrom(val);
+                if (!isRangeMode) setDateTo(val);
+              }}
+              style={{
+                padding: '7px 12px',
+                background: 'var(--color-bg-elevated)',
+                border: '1px solid var(--color-border)',
+                borderRadius: 8,
+                color: '#fff',
+                fontSize: 13,
+                fontWeight: 600,
+                cursor: 'pointer',
+                colorScheme: 'dark',
+              }}
+            />
+          </div>
+
+          {isRangeMode && (
+            <>
+              <span style={{ color: 'var(--color-text-muted)', fontSize: 12, fontWeight: 600 }}>ถึง</span>
+              <input
+                type="date"
+                value={formatDateInput(dateTo)}
+                min={dateFrom}
+                max={todayKey()}
+                onChange={(e) => setDateTo(e.target.value)}
+                style={{
+                  padding: '7px 12px',
+                  background: 'var(--color-bg-elevated)',
+                  border: '1px solid var(--color-border)',
+                  borderRadius: 8,
+                  color: '#fff',
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  colorScheme: 'dark',
+                }}
+              />
+            </>
+          )}
+        </div>
+
+        {/* Next Day */}
+        <button
+          onClick={handleNextDay}
+          disabled={(isSingleDay ? dateFrom : dateTo) >= todayKey()}
+          style={{
+            width: 32, height: 32, borderRadius: 8,
+            border: '1px solid var(--color-border)',
+            background: 'var(--color-bg-elevated)',
+            color: (isSingleDay ? dateFrom : dateTo) >= todayKey() ? 'rgba(255,255,255,0.15)' : 'var(--color-text-secondary)',
+            cursor: (isSingleDay ? dateFrom : dateTo) >= todayKey() ? 'not-allowed' : 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            transition: 'all 0.15s',
+          }}
+        >
+          <ChevronRight size={16} />
+        </button>
+
+        {/* Divider */}
+        <div style={{ width: 1, height: 28, background: 'rgba(255,255,255,0.08)' }} />
+
+        {/* Range Toggle */}
+        <button
+          onClick={() => {
+            setIsRangeMode(!isRangeMode);
+            if (isRangeMode) setDateTo(dateFrom);
+          }}
+          style={{
+            padding: '7px 14px',
+            borderRadius: 8,
+            border: isRangeMode ? '1px solid rgba(59, 130, 246, 0.4)' : '1px solid var(--color-border)',
+            background: isRangeMode ? 'rgba(59, 130, 246, 0.12)' : 'var(--color-bg-elevated)',
+            color: isRangeMode ? '#60a5fa' : 'var(--color-text-muted)',
+            fontSize: 12,
+            fontWeight: 600,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 5,
+            transition: 'all 0.15s',
+          }}
+        >
+          <Calendar size={13} />
+          {isRangeMode ? 'ช่วงวัน' : 'เลือกช่วง'}
+        </button>
+
+        {/* Current Date Label */}
+        <div style={{ marginLeft: 'auto', fontSize: 13, fontWeight: 700, color: 'var(--color-primary)' }}>
+          {isSingleDay
+            ? (isToday ? '📅 วันนี้ — ' : '📅 ') + toThaiDate(dateFrom)
+            : `📅 ${toThaiDate(dateFrom)} — ${toThaiDate(dateTo)}`
+          }
+        </div>
+      </div>
+
+      {/* ── Daily Summary KPI Cards ── */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14 }}>
+        {/* Total Sales */}
+        <div style={kpiCardStyle}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: 12, color: 'var(--color-text-secondary)', fontWeight: 600 }}>
+              ยอดขายรวม
+            </span>
+            <div style={iconBoxStyle('#f59e0b')}>
+              <TrendingUp size={18} />
+            </div>
+          </div>
+          <div style={{ fontSize: 26, fontWeight: 800, color: 'var(--color-primary)', fontFamily: 'var(--font-mono)' }}>
+            ฿{dailyStats.totalSales.toLocaleString()}
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>
+            เฉพาะบิลชำระแล้ว ({dailyStats.completedCount} บิล)
+          </div>
+        </div>
+
+        {/* Bill Count */}
+        <div style={kpiCardStyle}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: 12, color: 'var(--color-text-secondary)', fontWeight: 600 }}>
+              จำนวนบิลทั้งหมด
+            </span>
+            <div style={iconBoxStyle('#3b82f6')}>
+              <Hash size={18} />
+            </div>
+          </div>
+          <div style={{ fontSize: 26, fontWeight: 800, color: '#fff', fontFamily: 'var(--font-mono)' }}>
+            {dailyStats.billCount}
+          </div>
+          <div style={{ display: 'flex', gap: 10, fontSize: 11 }}>
+            <span style={{ color: '#10b981' }}>✅ {dailyStats.completedCount} ชำระ</span>
+            {dailyStats.voidedCount > 0 && (
+              <span style={{ color: '#ef4444' }}>❌ {dailyStats.voidedCount} ยกเลิก</span>
+            )}
+          </div>
+        </div>
+
+        {/* Average Ticket */}
+        <div style={kpiCardStyle}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: 12, color: 'var(--color-text-secondary)', fontWeight: 600 }}>
+              เฉลี่ยต่อบิล
+            </span>
+            <div style={iconBoxStyle('#10b981')}>
+              <Receipt size={18} />
+            </div>
+          </div>
+          <div style={{ fontSize: 26, fontWeight: 800, color: '#fff', fontFamily: 'var(--font-mono)' }}>
+            ฿{dailyStats.avgTicket.toLocaleString()}
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>
+            Average ticket size
+          </div>
+        </div>
+
+        {/* Payment Channel Breakdown */}
+        <div style={kpiCardStyle}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: 12, color: 'var(--color-text-secondary)', fontWeight: 600 }}>
+              ช่องทางชำระเงิน
+            </span>
+            <div style={iconBoxStyle('#8b5cf6')}>
+              <PieChart size={18} />
+            </div>
+          </div>
+          {/* Mini payment bars */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 4 }}>
+            {[
+              { label: 'เงินสด', amount: dailyStats.cashSales, color: '#10b981', icon: <Banknote size={12} /> },
+              { label: 'PromptPay', amount: dailyStats.promptpaySales, color: '#3b82f6', icon: <QrCode size={12} /> },
+              { label: 'บัตร', amount: dailyStats.cardSales, color: '#8b5cf6', icon: <CreditCard size={12} /> },
+            ].map((ch) => (
+              <div key={ch.label} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4, minWidth: 70, color: ch.color, fontSize: 11, fontWeight: 600 }}>
+                  {ch.icon} {ch.label}
+                </div>
+                <div style={{ flex: 1, height: 6, background: 'rgba(255,255,255,0.06)', borderRadius: 3, overflow: 'hidden' }}>
+                  <div
+                    style={{
+                      height: '100%',
+                      width: dailyStats.totalSales > 0 ? `${(ch.amount / dailyStats.totalSales) * 100}%` : '0%',
+                      background: ch.color,
+                      borderRadius: 3,
+                      transition: 'width 0.3s ease',
+                    }}
+                  />
+                </div>
+                <span style={{ fontSize: 11, fontWeight: 700, color: '#fff', fontFamily: 'var(--font-mono)', minWidth: 50, textAlign: 'right' }}>
+                  ฿{ch.amount.toLocaleString()}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* ── Search & Filters ── */}
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
         <div style={{ flex: 1, minWidth: 240, position: 'relative' }}>
           <Search size={15} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-muted)' }} />
           <input
             type="text"
-            placeholder={language === 'th' ? 'ค้นหาบิล, โต๊ะ, พนักงาน...' : 'Search bills, tables, staff...'}
+            placeholder={language === 'th' ? 'ค้นหาบิล, โต๊ะ, พนักงาน, เมนู...' : 'Search bills, tables, staff, items...'}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             style={{
@@ -249,12 +650,17 @@ export const BillLogs: React.FC = () => {
         </div>
       )}
 
-      {/* Bills Table */}
+      {/* ── Bills Table (grouped by date) ── */}
       <div style={cardStyle}>
-        {allBills.length === 0 ? (
+        {filteredBills.length === 0 ? (
           <div style={{ padding: 48, textAlign: 'center', color: 'var(--color-text-muted)' }}>
             <Receipt size={40} style={{ opacity: 0.3, marginBottom: 12 }} />
-            <p style={{ fontSize: 14, fontWeight: 600 }}>{language === 'th' ? 'ยังไม่มีประวัติบิล' : 'No bill history'}</p>
+            <p style={{ fontSize: 14, fontWeight: 600 }}>
+              {language === 'th' ? 'ไม่พบบิลในช่วงวันที่เลือก' : 'No bills found for the selected dates'}
+            </p>
+            <p style={{ fontSize: 12, marginTop: 4 }}>
+              {isSingleDay ? toThaiDate(dateFrom) : `${toThaiDate(dateFrom)} — ${toThaiDate(dateTo)}`}
+            </p>
           </div>
         ) : (
           <div style={{ overflowX: 'auto' }}>
@@ -263,7 +669,7 @@ export const BillLogs: React.FC = () => {
                 <tr>
                   <th style={thStyle}>บิล #</th>
                   <th style={thStyle}>โต๊ะ</th>
-                  <th style={thStyle}>วันที่ / เวลา</th>
+                  <th style={thStyle}>เวลา</th>
                   <th style={thStyle}>พนักงาน</th>
                   <th style={thStyle}>ยอดรวม</th>
                   <th style={thStyle}>ช่องทาง</th>
@@ -272,100 +678,153 @@ export const BillLogs: React.FC = () => {
                 </tr>
               </thead>
               <tbody>
-                {allBills.map((bill) => {
-                  const pm = getPaymentMethodLabel(bill.payment?.method);
+                {groupedBills.map((group) => {
+                  const groupTotal = group.bills.filter((b) => b.status === 'completed').reduce((sum, b) => sum + b.grandTotal, 0);
+                  const showDateHeader = !isSingleDay;
+
                   return (
-                    <tr
-                      key={bill.id}
-                      style={{ cursor: 'pointer', transition: 'background 0.15s' }}
-                      onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(255,255,255,0.02)')}
-                      onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
-                    >
-                      <td style={{ ...tdStyle, fontWeight: 700, color: 'var(--color-primary)' }}>{bill.orderNumber}</td>
-                      <td style={{ ...tdStyle, fontWeight: 600, color: '#fff' }}>T{bill.tableName}</td>
-                      <td style={tdStyle}>
-                        <div style={{ fontSize: 12, color: '#fff' }}>{formatDate(bill.updatedAt)}</div>
-                        <div style={{ fontSize: 11, color: 'var(--color-text-muted)', display: 'flex', alignItems: 'center', gap: 4 }}>
-                          <Clock size={10} /> {formatTime(bill.updatedAt)}
-                        </div>
-                      </td>
-                      <td style={{ ...tdStyle, fontSize: 12 }}>{bill.staffName}</td>
-                      <td style={{ ...tdStyle, fontWeight: 700, color: '#fff', fontFamily: 'var(--font-mono)' }}>
-                        ฿{bill.grandTotal.toLocaleString()}
-                      </td>
-                      <td style={tdStyle}>
-                        <span style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: 4,
-                          padding: '3px 8px',
-                          borderRadius: 6,
-                          fontSize: 11,
-                          fontWeight: 600,
-                          background: `${pm.color}15`,
-                          color: pm.color,
-                        }}>
-                          {pm.icon} {pm.label}
-                        </span>
-                      </td>
-                      <td style={tdStyle}>
-                        <span style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: 4,
-                          padding: '3px 8px',
-                          borderRadius: 6,
-                          fontSize: 11,
-                          fontWeight: 700,
-                          background: bill.status === 'completed' ? 'rgba(16, 185, 129, 0.12)' : 'rgba(239, 68, 68, 0.12)',
-                          color: bill.status === 'completed' ? '#10b981' : '#ef4444',
-                        }}>
-                          {bill.status === 'completed' ? '✅ ชำระแล้ว' : '❌ ยกเลิก'}
-                        </span>
-                      </td>
-                      <td style={{ ...tdStyle, textAlign: 'center' }}>
-                        <div style={{ display: 'flex', gap: 6, justifyContent: 'center' }}>
-                          <button
-                            onClick={() => setSelectedBill(bill)}
-                            title="ดูรายละเอียด"
+                    <React.Fragment key={group.dateKey}>
+                      {/* Date Group Header (for multi-day range) */}
+                      {showDateHeader && (
+                        <tr>
+                          <td
+                            colSpan={8}
                             style={{
-                              width: 32,
-                              height: 32,
-                              borderRadius: 8,
-                              border: '1px solid var(--color-border)',
-                              background: 'var(--color-bg-elevated)',
-                              color: 'var(--color-text-secondary)',
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
+                              padding: '12px 14px',
+                              background: 'rgba(245, 158, 11, 0.06)',
+                              borderBottom: '1px solid rgba(245, 158, 11, 0.15)',
+                              fontWeight: 700,
+                              fontSize: 13,
+                              color: 'var(--color-primary)',
                             }}
                           >
-                            <Eye size={14} />
-                          </button>
-                          {bill.status === 'completed' && (
-                            <button
-                              onClick={() => handleVoidClick(bill.id)}
-                              title="ยกเลิกบิล"
-                              style={{
-                                width: 32,
-                                height: 32,
-                                borderRadius: 8,
-                                border: '1px solid rgba(239, 68, 68, 0.3)',
-                                background: 'rgba(239, 68, 68, 0.08)',
-                                color: '#ef4444',
-                                cursor: 'pointer',
-                                display: 'flex',
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <span>
+                                📅 {toThaiDateLong(group.dateKey)} — {group.bills.length} บิล
+                              </span>
+                              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 14 }}>
+                                ฿{groupTotal.toLocaleString()}
+                              </span>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+
+                      {/* Bill Rows */}
+                      {group.bills.map((bill) => {
+                        const pm = getPaymentMethodLabel(bill.payment?.method);
+                        return (
+                          <tr
+                            key={bill.id}
+                            style={{ cursor: 'pointer', transition: 'background 0.15s' }}
+                            onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(255,255,255,0.02)')}
+                            onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                          >
+                            <td style={{ ...tdStyle, fontWeight: 700, color: 'var(--color-primary)' }}>{bill.orderNumber}</td>
+                            <td style={{ ...tdStyle, fontWeight: 600, color: '#fff' }}>T{bill.tableName}</td>
+                            <td style={tdStyle}>
+                              {isSingleDay ? (
+                                <div style={{ fontSize: 12, color: '#fff', display: 'flex', alignItems: 'center', gap: 4 }}>
+                                  <Clock size={11} style={{ color: 'var(--color-text-muted)' }} />
+                                  {formatTime(bill.updatedAt)}
+                                </div>
+                              ) : (
+                                <>
+                                  <div style={{ fontSize: 12, color: '#fff' }}>{formatDate(bill.updatedAt)}</div>
+                                  <div style={{ fontSize: 11, color: 'var(--color-text-muted)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                                    <Clock size={10} /> {formatTime(bill.updatedAt)}
+                                  </div>
+                                </>
+                              )}
+                            </td>
+                            <td style={{ ...tdStyle, fontSize: 12 }}>{bill.staffName}</td>
+                            <td style={{ ...tdStyle, fontWeight: 700, color: '#fff', fontFamily: 'var(--font-mono)' }}>
+                              ฿{bill.grandTotal.toLocaleString()}
+                            </td>
+                            <td style={tdStyle}>
+                              <span style={{
+                                display: 'inline-flex',
                                 alignItems: 'center',
-                                justifyContent: 'center',
-                              }}
-                            >
-                              <XCircle size={14} />
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
+                                gap: 4,
+                                padding: '3px 8px',
+                                borderRadius: 6,
+                                fontSize: 11,
+                                fontWeight: 600,
+                                background: `${pm.color}15`,
+                                color: pm.color,
+                              }}>
+                                {pm.icon} {pm.label}
+                              </span>
+                            </td>
+                            <td style={tdStyle}>
+                              <span style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: 4,
+                                padding: '3px 8px',
+                                borderRadius: 6,
+                                fontSize: 11,
+                                fontWeight: 700,
+                                background: bill.status === 'completed' ? 'rgba(16, 185, 129, 0.12)' : 'rgba(239, 68, 68, 0.12)',
+                                color: bill.status === 'completed' ? '#10b981' : '#ef4444',
+                              }}>
+                                {bill.status === 'completed' ? '✅ ชำระแล้ว' : '❌ ยกเลิก'}
+                              </span>
+                            </td>
+                            <td style={{ ...tdStyle, textAlign: 'center' }}>
+                              <div style={{ display: 'flex', gap: 6, justifyContent: 'center' }}>
+                                <button
+                                  onClick={() => setSelectedBill(bill)}
+                                  title="ดูรายละเอียด"
+                                  style={{
+                                    width: 32, height: 32, borderRadius: 8,
+                                    border: '1px solid var(--color-border)',
+                                    background: 'var(--color-bg-elevated)',
+                                    color: 'var(--color-text-secondary)',
+                                    cursor: 'pointer',
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                  }}
+                                >
+                                  <Eye size={14} />
+                                </button>
+                                {bill.status === 'completed' && (
+                                  <>
+                                    <button
+                                      onClick={() => handleReprintReceipt(bill)}
+                                      title="พิมพ์ใบเสร็จซ้ำ"
+                                      style={{
+                                        width: 32, height: 32, borderRadius: 8,
+                                        border: '1px solid rgba(59, 130, 246, 0.3)',
+                                        background: 'rgba(59, 130, 246, 0.08)',
+                                        color: '#60a5fa',
+                                        cursor: 'pointer',
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                      }}
+                                    >
+                                      <Printer size={14} />
+                                    </button>
+                                    <button
+                                      onClick={() => handleVoidClick(bill.id)}
+                                      title="ยกเลิกบิล"
+                                      style={{
+                                        width: 32, height: 32, borderRadius: 8,
+                                        border: '1px solid rgba(239, 68, 68, 0.3)',
+                                        background: 'rgba(239, 68, 68, 0.08)',
+                                        color: '#ef4444',
+                                        cursor: 'pointer',
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                      }}
+                                    >
+                                      <XCircle size={14} />
+                                    </button>
+                                  </>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </React.Fragment>
                   );
                 })}
               </tbody>
@@ -374,7 +833,7 @@ export const BillLogs: React.FC = () => {
         )}
       </div>
 
-      {/* Bill Detail Modal */}
+      {/* ── Bill Detail Modal ── */}
       {selectedBill && (
         <div
           onClick={() => setSelectedBill(null)}
@@ -549,6 +1008,14 @@ export const BillLogs: React.FC = () => {
                       </div>
                     </div>
                   )}
+                  {selectedBill.payment.cardLast4 && (
+                    <div style={{ gridColumn: '1 / -1' }}>
+                      <span style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>หมายเลขบัตร</span>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: '#fff', marginTop: 2 }}>
+                        •••• •••• •••• {selectedBill.payment.cardLast4}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -583,7 +1050,7 @@ export const BillLogs: React.FC = () => {
         </div>
       )}
 
-      {/* Void Confirmation Modal */}
+      {/* ── Void Confirmation Modal ── */}
       {showVoidModal && (
         <div
           onClick={() => setShowVoidModal(false)}

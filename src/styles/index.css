@@ -43,7 +43,10 @@
   --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
   --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -2px rgba(0, 0, 0, 0.3);
   --shadow-lg: 0 10px 25px -3px rgba(0, 0, 0, 0.5), 0 4px 6px -4px rgba(0, 0, 0, 0.5);
-  --shadow-glow: 0 0 20px rgba(245, 158, 11, 0.25);
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
 }
 
 * {
@@ -59,6 +62,7 @@ body {
   background-color: var(--color-bg-main);
   color: var(--color-text-primary);
   min-height: 100vh;
+  min-height: 100dvh;
   overflow-x: hidden;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
@@ -69,6 +73,7 @@ button,
 textarea,
 select {
   font-family: inherit;
+  touch-action: manipulation;
 }
 
 /* Custom Smooth Scrollbars */
@@ -730,4 +735,38 @@ select {
 .touch-btn {
   min-height: 48px;
   min-width: 48px;
+}
+
+/* Tablet & iPad Mini Landscape Optimizations (1024px - 1180px) */
+@media screen and (max-width: 1180px) {
+  .app-header {
+    padding-left: max(12px, var(--safe-left)) !important;
+    padding-right: max(12px, var(--safe-right)) !important;
+  }
+
+  .brand-title-text {
+    max-width: 170px !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+
+  .quick-shift-text {
+    max-width: 140px !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+}
+
+/* Height-constrained tablets (iPad Mini landscape: ~680px - 768px height) */
+@media screen and (max-height: 800px) {
+  .modal-content-card {
+    max-height: 94vh !important;
+  }
+
+  .modal-content-card .modal-scroll-area {
+    padding: 14px 18px !important;
+    gap: 14px !important;
+  }
 }

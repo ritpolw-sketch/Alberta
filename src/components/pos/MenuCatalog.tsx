@@ -28,13 +28,76 @@ export const MenuCatalog: React.FC<MenuCatalogProps> = ({ onSelectItem }) => {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
-      {/* Items Grid (Middle scrollable) */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: 14 }}>
+      {/* Top Categories Navigation */}
+      <div
+        style={{
+          display: 'flex',
+          gap: 6,
+          overflowX: 'auto',
+          padding: '8px 12px',
+          background: 'var(--color-bg-card)',
+          borderBottom: '1px solid var(--color-border)',
+          flexShrink: 0,
+          scrollbarWidth: 'none',
+        }}
+      >
+        <button
+          onClick={() => setActiveCategory('all')}
+          style={{
+            padding: '6px 12px',
+            borderRadius: 'var(--radius-sm)',
+            border: '1px solid ' + (activeCategory === 'all' ? 'var(--color-primary)' : 'var(--color-border)'),
+            background: activeCategory === 'all' ? 'rgba(245, 158, 11, 0.15)' : 'rgba(255, 255, 255, 0.04)',
+            color: activeCategory === 'all' ? 'var(--color-primary)' : 'var(--color-text-secondary)',
+            fontSize: 12,
+            fontWeight: 700,
+            cursor: 'pointer',
+            whiteSpace: 'nowrap',
+            transition: 'all 0.15s ease',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 5,
+            flexShrink: 0,
+          }}
+        >
+          <span>🍽️</span>
+          <span>{language === 'th' ? 'ทุกเมนู' : 'All'}</span>
+        </button>
+
+        {categories.map((cat) => (
+          <button
+            key={cat.id}
+            onClick={() => setActiveCategory(cat.id)}
+            style={{
+              padding: '6px 12px',
+              borderRadius: 'var(--radius-sm)',
+              border: '1px solid ' + (activeCategory === cat.id ? 'var(--color-primary)' : 'var(--color-border)'),
+              background: activeCategory === cat.id ? 'rgba(245, 158, 11, 0.15)' : 'rgba(255, 255, 255, 0.04)',
+              color: activeCategory === cat.id ? 'var(--color-primary)' : 'var(--color-text-secondary)',
+              fontSize: 12,
+              fontWeight: 700,
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+              transition: 'all 0.15s ease',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 5,
+              flexShrink: 0,
+            }}
+          >
+            <span>{cat.icon}</span>
+            <span>{language === 'th' ? cat.nameTh : cat.nameEn}</span>
+          </button>
+        ))}
+      </div>
+
+      {/* Items Grid (Middle scrollable with generous bottom clearance) */}
+      <div style={{ flex: 1, overflowY: 'auto', padding: '12px 12px 36px 12px' }}>
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(135px, 1fr))',
-            gap: 12,
+            gridTemplateColumns: 'repeat(auto-fill, minmax(125px, 1fr))',
+            gap: 10,
           }}
         >
           {filteredItems.map((item) => {
@@ -98,7 +161,7 @@ export const MenuCatalog: React.FC<MenuCatalogProps> = ({ onSelectItem }) => {
                   </div>
                 )}
                 {/* Image Banner */}
-                <div style={{ height: 85, position: 'relative', overflow: 'hidden', background: '#1e293b' }}>
+                <div style={{ height: 80, position: 'relative', overflow: 'hidden', background: '#1e293b' }}>
                   {item.imageUrl ? (
                     <img
                       src={item.imageUrl}
@@ -113,7 +176,7 @@ export const MenuCatalog: React.FC<MenuCatalogProps> = ({ onSelectItem }) => {
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        fontSize: 28,
+                        fontSize: 26,
                       }}
                     >
                       🍽️
@@ -180,7 +243,6 @@ export const MenuCatalog: React.FC<MenuCatalogProps> = ({ onSelectItem }) => {
                     </span>
 
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-
                       {item.inStock && (
                         <div
                           style={{
@@ -205,65 +267,6 @@ export const MenuCatalog: React.FC<MenuCatalogProps> = ({ onSelectItem }) => {
             );
           })}
         </div>
-      </div>
-
-      {/* Bottom Categories Navigation */}
-      <div
-        style={{
-          display: 'flex',
-          gap: 8,
-          overflowX: 'auto',
-          padding: '10px 14px',
-          background: 'var(--color-bg-card)',
-          borderTop: '1px solid var(--color-border)',
-        }}
-      >
-        <button
-          onClick={() => setActiveCategory('all')}
-          style={{
-            padding: '8px 16px',
-            borderRadius: 'var(--radius-sm)',
-            border: '1px solid ' + (activeCategory === 'all' ? 'var(--color-primary)' : 'var(--color-border)'),
-            background: activeCategory === 'all' ? 'rgba(245, 158, 11, 0.15)' : 'rgba(255, 255, 255, 0.04)',
-            color: activeCategory === 'all' ? 'var(--color-primary)' : 'var(--color-text-secondary)',
-            fontSize: 13,
-            fontWeight: 700,
-            cursor: 'pointer',
-            whiteSpace: 'nowrap',
-            transition: 'all 0.15s ease',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 6,
-          }}
-        >
-          <span>🍽️</span>
-          <span>{language === 'th' ? 'ทุกเมนู' : 'All'}</span>
-        </button>
-
-        {categories.map((cat) => (
-          <button
-            key={cat.id}
-            onClick={() => setActiveCategory(cat.id)}
-            style={{
-              padding: '8px 16px',
-              borderRadius: 'var(--radius-sm)',
-              border: '1px solid ' + (activeCategory === cat.id ? 'var(--color-primary)' : 'var(--color-border)'),
-              background: activeCategory === cat.id ? 'rgba(245, 158, 11, 0.15)' : 'rgba(255, 255, 255, 0.04)',
-              color: activeCategory === cat.id ? 'var(--color-primary)' : 'var(--color-text-secondary)',
-              fontSize: 13,
-              fontWeight: 700,
-              cursor: 'pointer',
-              whiteSpace: 'nowrap',
-              transition: 'all 0.15s ease',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6,
-            }}
-          >
-            <span>{cat.icon}</span>
-            <span>{language === 'th' ? cat.nameTh : cat.nameEn}</span>
-          </button>
-        ))}
       </div>
     </div>
   );

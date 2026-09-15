@@ -16,6 +16,9 @@ import {
   Menu as MenuIcon,
   X as CloseIcon,
   ChevronDown,
+  Clock,
+  Bot,
+  Key,
 } from 'lucide-react';
 
 const POSContent: React.FC = () => {
@@ -26,6 +29,9 @@ const POSContent: React.FC = () => {
     activeModal,
     setActiveModal,
     settings,
+    currentShift,
+    adminSubTab,
+    setAdminSubTab,
   } = usePOS();
 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -53,7 +59,36 @@ const POSContent: React.FC = () => {
     pos: { icon: <Receipt size={15} />, th: 'สั่งอาหาร & บิล', en: 'Order & Bill' },
     tables: { icon: <LayoutGrid size={15} />, th: 'จัดการผังโต๊ะ', en: 'Table Layout' },
     kds: { icon: <Flame size={15} />, th: 'จอครัว (KDS)', en: 'Kitchen KDS' },
-    admin: { icon: <BarChart3 size={15} />, th: 'เจ้าของร้าน', en: 'Admin' },
+    admin: {
+      icon:
+        adminSubTab === 'procurement' ? (
+          <Bot size={15} />
+        ) : adminSubTab === 'shifts' ? (
+          <Clock size={15} />
+        ) : adminSubTab === 'bills' ? (
+          <Receipt size={15} />
+        ) : (
+          <BarChart3 size={15} />
+        ),
+      th:
+        adminSubTab === 'procurement'
+          ? 'จัดซื้อ & LINE Agent'
+          : adminSubTab === 'shifts'
+          ? 'จัดการกะ'
+          : adminSubTab === 'bills'
+          ? 'ประวัติบิล (Bill Logs)'
+          : currentStaff?.role === 'owner' || currentStaff?.role === 'admin'
+          ? 'เจ้าของร้าน (Admin)'
+          : 'จัดการระบบ',
+      en:
+        adminSubTab === 'procurement'
+          ? 'Procurement Agent'
+          : adminSubTab === 'shifts'
+          ? 'Manage Shifts'
+          : adminSubTab === 'bills'
+          ? 'Bill Logs'
+          : 'Admin',
+    },
   };
 
   const currentTabInfo = tabLabels[activeTab] || tabLabels.pos;
@@ -62,6 +97,7 @@ const POSContent: React.FC = () => {
     <div className="app-container" style={{ flexDirection: 'column' }}>
       {/* Top Navbar - Full Width */}
       <header
+        className="app-header"
         style={{
           height: 48,
           minHeight: 48,
@@ -71,15 +107,15 @@ const POSContent: React.FC = () => {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          padding: '0 16px',
+          padding: '0 max(16px, var(--safe-right)) 0 max(16px, var(--safe-left))',
           zIndex: 50,
-          gap: 12,
+          gap: 10,
         }}
       >
         {/* Left: Hamburger Menu + Restaurant Name */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
           {/* Hamburger + Active Tab Dropdown */}
-          <div ref={menuRef} style={{ position: 'relative' }}>
+          <div ref={menuRef} style={{ position: 'relative', flexShrink: 0 }}>
             <button
               onClick={() => setIsMenuOpen(!isMenuOpen)}
               style={{
@@ -95,6 +131,7 @@ const POSContent: React.FC = () => {
                 fontSize: 13,
                 fontWeight: 700,
                 transition: 'all 0.15s',
+                whiteSpace: 'nowrap',
               }}
             >
               {isMenuOpen ? <CloseIcon size={16} /> : <MenuIcon size={16} />}
@@ -112,19 +149,23 @@ const POSContent: React.FC = () => {
                   position: 'absolute',
                   top: 'calc(100% + 6px)',
                   left: 0,
-                  minWidth: 220,
+                  minWidth: 230,
                   background: 'rgba(17, 24, 39, 0.98)',
                   backdropFilter: 'blur(16px)',
                   border: '1px solid var(--color-border)',
                   borderRadius: 10,
-                  padding: 6,
-                  boxShadow: '0 8px 32px rgba(0, 0, 0, 0.5)',
+                  padding: '8px 6px',
+                  boxShadow: '0 12px 36px rgba(0, 0, 0, 0.6)',
                   zIndex: 100,
                   display: 'flex',
                   flexDirection: 'column',
-                  gap: 2,
+                  gap: 3,
                 }}
               >
+                <div style={{ padding: '4px 8px 2px', fontSize: 10, fontWeight: 800, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  หน้าร้าน & ครัว
+                </div>
+
                 <button onClick={() => handleTabClick('pos')} className={`nav-item ${activeTab === 'pos' ? 'active' : ''}`}>
                   <Receipt size={16} />
                   <span>สั่งอาหาร & บิล</span>
@@ -133,15 +174,93 @@ const POSContent: React.FC = () => {
                   <LayoutGrid size={16} />
                   <span>จัดการผังโต๊ะ</span>
                 </button>
-                <button onClick={() => handleTabClick('kds')} className={`nav-item ${activeTab === 'kds' ? 'active' : ''}`}>
+                <button onClick={() => handleTabClick('kds')} className={`nav-item ${activeTab === 'kds' ? 'active' : ''}`} style={{ position: 'relative' }}>
                   <Flame size={16} />
                   <span>จอในครัว (KDS)</span>
                 </button>
+
+                <div style={{ height: 1, background: 'var(--color-border)', margin: '4px 0' }} />
+
+                <div style={{ padding: '4px 8px 2px', fontSize: 10, fontWeight: 800, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  การเงิน & กะ
+                </div>
+
+                <button
+                  onClick={() => {
+                    setAdminSubTab('shifts');
+                    handleTabClick('admin');
+                  }}
+                  className={`nav-item ${activeTab === 'admin' && adminSubTab === 'shifts' ? 'active' : ''}`}
+                  style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <Clock size={16} style={{ color: currentShift.status === 'open' ? '#34d399' : '#f87171' }} />
+                    <span>จัดการกะ & ลิ้นชักเงิน</span>
+                  </div>
+                  <span
+                    style={{
+                      fontSize: 10,
+                      padding: '1px 6px',
+                      borderRadius: 10,
+                      fontWeight: 700,
+                      background: currentShift.status === 'open' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)',
+                      color: currentShift.status === 'open' ? '#34d399' : '#f87171',
+                    }}
+                  >
+                    {currentShift.status === 'open' ? 'เปิด' : 'ปิด'}
+                  </span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    setAdminSubTab('bills');
+                    handleTabClick('admin');
+                  }}
+                  className={`nav-item ${activeTab === 'admin' && adminSubTab === 'bills' ? 'active' : ''}`}
+                >
+                  <Receipt size={16} />
+                  <span>ประวัติบิล (Bill Logs)</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    setAdminSubTab('procurement');
+                    handleTabClick('admin');
+                  }}
+                  className={`nav-item ${activeTab === 'admin' && adminSubTab === 'procurement' ? 'active' : ''}`}
+                >
+                  <Bot size={16} style={{ color: '#06b6d4' }} />
+                  <span>จัดซื้อ & LINE Agent</span>
+                </button>
+
                 {(currentStaff?.role === 'owner' || currentStaff?.role === 'admin') && (
-                  <button onClick={() => handleTabClick('admin')} className={`nav-item ${activeTab === 'admin' ? 'active' : ''}`}>
-                    <BarChart3 size={16} />
-                    <span>เจ้าของร้าน (Admin)</span>
-                  </button>
+                  <>
+                    <div style={{ height: 1, background: 'var(--color-border)', margin: '4px 0' }} />
+                    <div style={{ padding: '4px 8px 2px', fontSize: 10, fontWeight: 800, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                      การจัดการระบบ
+                    </div>
+                    <button
+                      onClick={() => {
+                        setAdminSubTab('api_keys');
+                        handleTabClick('admin');
+                      }}
+                      className={`nav-item ${activeTab === 'admin' && adminSubTab === 'api_keys' ? 'active' : ''}`}
+                    >
+                      <Key size={16} style={{ color: '#c084fc' }} />
+                      <span>API Key & โปรแกรมบัญชี</span>
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setAdminSubTab('dashboard');
+                        handleTabClick('admin');
+                      }}
+                      className={`nav-item ${activeTab === 'admin' && adminSubTab !== 'shifts' && adminSubTab !== 'bills' && adminSubTab !== 'procurement' && adminSubTab !== 'api_keys' ? 'active' : ''}`}
+                    >
+                      <BarChart3 size={16} />
+                      <span>เจ้าของร้าน (Admin)</span>
+                    </button>
+                  </>
                 )}
 
                 {/* Divider */}
@@ -186,14 +305,15 @@ const POSContent: React.FC = () => {
           </div>
 
           {/* Divider */}
-          <div style={{ width: 1, height: 24, background: 'rgba(255, 255, 255, 0.1)' }} />
+          <div style={{ width: 1, height: 24, background: 'rgba(255, 255, 255, 0.1)', flexShrink: 0 }} />
 
           {/* Restaurant Name */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
             <div
               style={{
                 width: 32,
                 height: 32,
+                minWidth: 32,
                 borderRadius: 8,
                 background: 'linear-gradient(135deg, #f59e0b, #ea580c)',
                 display: 'flex',
@@ -201,15 +321,29 @@ const POSContent: React.FC = () => {
                 justifyContent: 'center',
                 fontSize: 18,
                 boxShadow: '0 2px 8px rgba(245, 158, 11, 0.3)',
+                flexShrink: 0,
               }}
             >
               🍲
             </div>
-            <div>
-              <h1 style={{ fontSize: 15, fontWeight: 800, color: '#fff', margin: 0, letterSpacing: '-0.01em' }}>
+            <div style={{ minWidth: 0 }}>
+              <h1
+                className="brand-title-text"
+                style={{
+                  fontSize: 15,
+                  fontWeight: 800,
+                  color: '#fff',
+                  margin: 0,
+                  letterSpacing: '-0.01em',
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  maxWidth: 220,
+                }}
+              >
                 {settings.restaurantNameTh}
               </h1>
-              <div style={{ fontSize: 10, color: 'var(--color-text-secondary)', display: 'flex', alignItems: 'center', gap: 5 }}>
+              <div style={{ fontSize: 10, color: 'var(--color-text-secondary)', display: 'flex', alignItems: 'center', gap: 5, whiteSpace: 'nowrap' }}>
                 <span
                   style={{
                     width: 6,
@@ -218,6 +352,7 @@ const POSContent: React.FC = () => {
                     background: 'var(--color-emerald)',
                     boxShadow: '0 0 6px var(--color-emerald)',
                     display: 'inline-block',
+                    flexShrink: 0,
                   }}
                 />
                 <span>ระบบออนไลน์</span>
@@ -228,41 +363,85 @@ const POSContent: React.FC = () => {
           </div>
         </div>
 
-        {/* Right: Staff Badge (quick display) */}
-        <button
-          onClick={() => setActiveModal('pin')}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8,
-            background: 'var(--color-bg-elevated)',
-            border: '1px solid var(--color-border)',
-            padding: '5px 12px 5px 6px',
-            borderRadius: 20,
-            cursor: 'pointer',
-            transition: 'all 0.2s',
-          }}
-        >
-          <div
+        {/* Right: Quick Shift Status + Staff Badge */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+          <button
+            onClick={() => {
+              setAdminSubTab('shifts');
+              setActiveTab('admin');
+            }}
+            title="คลิกเพื่อจัดการกะและเปิด/ปิดลิ้นชักเงิน"
             style={{
-              width: 26,
-              height: 26,
-              borderRadius: '50%',
-              background: currentStaff?.avatarColor || 'var(--color-primary)',
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'center',
+              gap: 6,
+              background: currentShift.status === 'open' ? 'rgba(16, 185, 129, 0.12)' : 'rgba(239, 68, 68, 0.12)',
+              border: `1px solid ${currentShift.status === 'open' ? 'rgba(16, 185, 129, 0.35)' : 'rgba(239, 68, 68, 0.35)'}`,
+              borderRadius: 20,
+              padding: '5px 12px',
+              cursor: 'pointer',
+              color: currentShift.status === 'open' ? '#34d399' : '#f87171',
               fontSize: 12,
               fontWeight: 700,
-              color: '#fff',
+              transition: 'all 0.15s',
+              whiteSpace: 'nowrap',
             }}
           >
-            {currentStaff ? currentStaff.name.charAt(0) : <Lock size={10} />}
-          </div>
-          <span style={{ fontSize: 12, fontWeight: 700, color: '#fff' }}>
-            {currentStaff ? currentStaff.name : 'PIN'}
-          </span>
-        </button>
+            <span
+              style={{
+                width: 7,
+                height: 7,
+                borderRadius: '50%',
+                background: currentShift.status === 'open' ? '#10b981' : '#ef4444',
+                boxShadow: currentShift.status === 'open' ? '0 0 6px #10b981' : 'none',
+                flexShrink: 0,
+              }}
+            />
+            <Clock size={13} style={{ flexShrink: 0 }} />
+            <span className="quick-shift-text">
+              {currentShift.status === 'open'
+                ? `กะ: เปิด (ทอน ฿${currentShift.openingFloat.toLocaleString()})`
+                : 'กะ: ปิด (แตะเปิด)'}
+            </span>
+          </button>
+
+          <button
+            onClick={() => setActiveModal('pin')}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              background: 'var(--color-bg-elevated)',
+              border: '1px solid var(--color-border)',
+              padding: '5px 12px 5px 6px',
+              borderRadius: 20,
+              cursor: 'pointer',
+              transition: 'all 0.2s',
+              flexShrink: 0,
+            }}
+          >
+            <div
+              style={{
+                width: 26,
+                height: 26,
+                borderRadius: '50%',
+                background: currentStaff?.avatarColor || 'var(--color-primary)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: 12,
+                fontWeight: 700,
+                color: '#fff',
+                flexShrink: 0,
+              }}
+            >
+              {currentStaff ? currentStaff.name.charAt(0) : <Lock size={10} />}
+            </div>
+            <span style={{ fontSize: 12, fontWeight: 700, color: '#fff', maxWidth: 100, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {currentStaff ? currentStaff.name : 'PIN'}
+            </span>
+          </button>
+        </div>
       </header>
 
       {/* Main View Area - Takes remaining height */}
@@ -299,4 +478,3 @@ export default function App() {
     </POSProvider>
   );
 }
-

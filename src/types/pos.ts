@@ -154,7 +154,137 @@ export interface CashTransaction {
 
 export type StaffRole = 'admin' | 'manager' | 'cashier' | 'owner' | 'kitchen';
 
-export type AdminSubTab = 'dashboard' | 'bills' | 'menu' | 'financing' | 'employees' | 'settings';
+export type AdminSubTab = 'dashboard' | 'bills' | 'menu' | 'financing' | 'shifts' | 'employees' | 'settings' | 'procurement' | 'api_keys';
+
+export type OrderingChannelMethod = 'line_group' | 'line_oa' | 'phone' | 'email_pdf';
+export type SupplierPaymentTerm = 'promptpay_cod' | 'credit_7' | 'credit_15' | 'credit_30' | 'cash_drawer';
+
+export interface SupplierWorkflowConfig {
+  channelMethod: OrderingChannelMethod;
+  paymentTerm: SupplierPaymentTerm;
+  autoApproveThreshold: number; // custom threshold limit in Baht for this supplier
+  requireOwnerApproval: boolean;
+  autoSendLineOnLowStock: boolean;
+  requireDeliveryProofUpload: boolean;
+  specialInstructions?: string;
+}
+
+export interface Supplier {
+  id: string;
+  name: string;
+  contactPerson: string;
+  phone: string;
+  lineId: string;
+  lineGroup: string;
+  category: string;
+  promptPayId: string;
+  accountName: string;
+  bankName: string;
+  creditDays: number;
+  workflowConfig?: SupplierWorkflowConfig;
+}
+
+export interface InventoryItem {
+  id: string;
+  nameTh: string;
+  nameEn: string;
+  unit: string;
+  currentStock: number;
+  minSafetyThreshold: number;
+  avgCost: number;
+  supplierId: string;
+  category: string;
+}
+
+export interface POItem {
+  inventoryItemId: string;
+  nameTh: string;
+  unit: string;
+  qtyOrdered: number;
+  unitPrice: number;
+  total: number;
+}
+
+export type POStatus = 'draft' | 'sent_line' | 'ocr_received' | 'reconciled' | 'completed' | 'cancelled';
+
+export interface PurchaseOrder {
+  id: string;
+  poNumber: string;
+  supplierId: string;
+  supplierName: string;
+  status: POStatus;
+  items: POItem[];
+  subtotal: number;
+  grandTotal: number;
+  createdAt: string;
+  createdBy: string;
+  sentToLineAt?: string;
+  scannedBillUrl?: string;
+  ocrExtractedTotal?: number;
+  discrepancyAmount?: number;
+  promptPayQrPayload?: string;
+  promptPayQrImage?: string;
+  paymentStatus: 'pending' | 'paid';
+  paidAt?: string;
+  stockIngested: boolean;
+}
+
+export interface LineAgentConfig {
+  botEnabled: boolean;
+  autoApprovalThreshold: number;
+  autoSendLineOnLowStock: boolean;
+  verifySupplierBankWhitelist: boolean;
+}
+
+export interface LineMessageLog {
+  id: string;
+  poId?: string;
+  supplierName: string;
+  direction: 'outbound' | 'inbound';
+  sender: string;
+  messageText: string;
+  imageUrl?: string;
+  qrPayload?: string;
+  timestamp: string;
+  ocrStatus?: 'success' | 'discrepancy' | 'verified';
+}
+
+export type ApiKeyPermission = 'read_sales' | 'read_bills' | 'read_write_pos' | 'read_inventory' | 'export_vat_tax' | 'accounting_sync';
+
+export interface ApiKey {
+  id: string;
+  name: string;
+  keySecret: string;
+  environment: 'live' | 'test';
+  permissions: ApiKeyPermission[];
+  createdAt: string;
+  lastUsedAt?: string;
+  active: boolean;
+}
+
+export interface WebhookEndpoint {
+  id: string;
+  targetUrl: string;
+  secretHeader: string;
+  events: ('bill.completed' | 'po.paid' | 'shift.closed' | 'stock.low_alert')[];
+  active: boolean;
+  lastTriggeredAt?: string;
+  lastStatus?: 'success' | 'failed';
+}
+
+export type AccountingPlatform = 'flowaccount' | 'peak' | 'trcloud' | 'express' | 'xero' | 'custom_mcp';
+
+export interface AccountingIntegrationConfig {
+  platform: AccountingPlatform;
+  apiKey: string;
+  apiSecret: string;
+  autoSyncDailySales: boolean;
+  autoSyncPurchaseOrders: boolean;
+  vatTaxSync: boolean;
+  salesAccountCode: string;
+  cogsAccountCode: string;
+  lastSyncedAt?: string;
+}
 
 export interface StaffUser {
   id: string;
@@ -164,6 +294,39 @@ export interface StaffUser {
   avatarColor: string;
   phone?: string;
   startDate?: string;
+}
+
+export interface ScanChannelConfig {
+  enabled: boolean;
+  accountName: string;
+  accountNumber: string; // Bank account or PromptPay Phone/Tax ID
+  bankName: string; // e.g. PromptPay, KBANK, SCB, BBL, KTB, TTB, GSB, BAY
+  qrType: 'generated' | 'custom_image'; // 'generated' uses dynamic QR canvas; 'custom_image' uses uploaded QR
+  customQrUrl?: string; // base64 or image url
+}
+
+export type CardGatewayType = 'edc_terminal' | 'omise' | 'stripe' | 'kpayment' | 'gbprimepay' | '2c2p';
+
+export interface CardGatewayConfig {
+  enabled: boolean;
+  gatewayType: CardGatewayType;
+  terminalId?: string;
+  merchantId?: string;
+  apiKey?: string;
+  secretKey?: string;
+  feePercentage?: number; // e.g. 2.5%
+  passFeeToCustomer?: boolean;
+}
+
+export interface CashChannelConfig {
+  enabled: boolean;
+  allowQuickDenominations?: boolean;
+}
+
+export interface PaymentChannelsSettings {
+  cash: CashChannelConfig;
+  scan: ScanChannelConfig;
+  card: CardGatewayConfig;
 }
 
 export interface RestaurantSettings {
@@ -181,4 +344,6 @@ export interface RestaurantSettings {
   addressTh: string;
   addressEn: string;
   phone: string;
+  paymentChannels?: PaymentChannelsSettings;
 }
+

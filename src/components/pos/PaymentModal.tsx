@@ -30,7 +30,51 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose }) =
     setActiveModal,
   } = usePOS();
 
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('promptpay');
+  const paymentChannels = settings.paymentChannels || {
+    cash: { enabled: true, allowQuickDenominations: true },
+    scan: { enabled: true, accountName: settings.promptPayName, accountNumber: settings.promptPayId, bankName: 'PromptPay', qrType: 'generated' },
+    card: { enabled: true, gatewayType: 'edc_terminal', terminalId: 'EDC-882194', feePercentage: 2.5 },
+  };
+
+  const availableMethods: { id: PaymentMethod; labelTh: string; labelEn: string; icon: React.ReactNode; color: string; border: string; bg: string }[] = [];
+  if (paymentChannels.scan?.enabled) {
+    availableMethods.push({
+      id: 'promptpay',
+      labelTh: paymentChannels.scan.qrType === 'custom_image' ? 'สแกน QR ร้าน' : 'PromptPay QR',
+      labelEn: 'QR Scan',
+      icon: <QrCode size={22} />,
+      color: '#60a5fa',
+      border: '#3b82f6',
+      bg: 'rgba(59, 130, 246, 0.15)',
+    });
+  }
+  if (paymentChannels.cash?.enabled) {
+    availableMethods.push({
+      id: 'cash',
+      labelTh: 'เงินสด (Cash)',
+      labelEn: 'Cash',
+      icon: <Banknote size={22} />,
+      color: '#34d399',
+      border: '#10b981',
+      bg: 'rgba(16, 185, 129, 0.15)',
+    });
+  }
+  if (paymentChannels.card?.enabled) {
+    availableMethods.push({
+      id: 'card',
+      labelTh: 'บัตรเครดิต/เดบิต',
+      labelEn: 'Card / EDC',
+      icon: <CreditCard size={22} />,
+      color: 'var(--color-primary)',
+      border: 'var(--color-primary)',
+      bg: 'rgba(245, 158, 11, 0.15)',
+    });
+  }
+
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(() => {
+    return availableMethods[0]?.id || 'promptpay';
+  });
+
   const [cashTendered, setCashTendered] = useState<string>('');
   const [cardLast4, setCardLast4] = useState<string>('');
   const [splitCount, setSplitCount] = useState<number>(1);
@@ -43,20 +87,31 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose }) =
   const grandTotal = activeOrder?.grandTotal || 0;
   const splitAmount = Math.ceil(grandTotal / splitCount);
 
-  // Generate PromptPay QR when in PromptPay tab
+  const scanAccountNo = paymentChannels.scan?.accountNumber || settings.promptPayId;
+  const scanAccountName = paymentChannels.scan?.accountName || settings.promptPayName;
+  const isCustomQr = paymentChannels.scan?.qrType === 'custom_image' && !!paymentChannels.scan?.customQrUrl;
+
+  // Auto switch if active method is disabled
   useEffect(() => {
-    if (paymentMethod === 'promptpay' && canvasRef.current && activeOrder) {
-      const payload = generatePromptPayPayload(settings.promptPayId, grandTotal);
+    if (availableMethods.length > 0 && !availableMethods.some((m) => m.id === paymentMethod)) {
+      setPaymentMethod(availableMethods[0].id);
+    }
+  }, [availableMethods, paymentMethod]);
+
+  // Generate PromptPay QR when in PromptPay tab (if dynamic generator)
+  useEffect(() => {
+    if (paymentMethod === 'promptpay' && canvasRef.current && activeOrder && !isCustomQr) {
+      const payload = generatePromptPayPayload(scanAccountNo, grandTotal);
       QRCode.toCanvas(canvasRef.current, payload, {
-        width: 220,
-        margin: 2,
+        width: 160,
+        margin: 1,
         color: {
           dark: '#002d62', // Deep PromptPay Blue
           light: '#ffffff',
         },
       }).catch((err) => console.error('PromptPay QR Error:', err));
     }
-  }, [paymentMethod, grandTotal, settings.promptPayId, activeOrder]);
+  }, [paymentMethod, grandTotal, scanAccountNo, activeOrder, isCustomQr]);
 
   // Set default cash tendered to exact amount
   useEffect(() => {
@@ -113,18 +168,18 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose }) =
   };
 
   const handleCopyPromptPay = () => {
-    navigator.clipboard.writeText(settings.promptPayId);
+    navigator.clipboard.writeText(scanAccountNo);
     setCopiedPromptPay(true);
     setTimeout(() => setCopiedPromptPay(false), 2000);
   };
 
   return (
     <div className="modal-overlay">
-      <div className="modal-content-card" style={{ width: 620, maxHeight: '92vh' }}>
+      <div className="modal-content-card" style={{ width: 560, maxHeight: '92vh' }}>
         {/* Header */}
         <div
           style={{
-            padding: '18px 24px',
+            padding: '12px 18px',
             background: 'var(--color-bg-elevated)',
             borderBottom: '1px solid var(--color-border)',
             display: 'flex',
@@ -133,10 +188,10 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose }) =
           }}
         >
           <div>
-            <h2 style={{ fontSize: 20, fontWeight: 800, color: '#fff' }}>
+            <h2 style={{ fontSize: 18, fontWeight: 800, color: '#fff' }}>
               {language === 'th' ? `เช็คบิล โต๊ะ ${activeOrder.tableName}` : `Checkout Table ${activeOrder.tableName}`}
             </h2>
-            <p style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginTop: 2 }}>
+            <p style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginTop: 1 }}>
               {activeOrder.orderNumber} • {activeOrder.items.length} {language === 'th' ? 'รายการ' : 'items'}
             </p>
           </div>
@@ -241,24 +296,24 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose }) =
           </div>
         ) : (
           /* Payment Selection Form */
-          <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 20 }}>
+          <div style={{ flex: 1, overflowY: 'auto', padding: '14px 18px', display: 'flex', flexDirection: 'column', gap: 12 }}>
             {/* Total Display Banner */}
             <div
               style={{
                 background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.12), rgba(217, 119, 6, 0.04))',
                 border: '1px solid rgba(245, 158, 11, 0.3)',
                 borderRadius: 'var(--radius-lg)',
-                padding: '16px 20px',
+                padding: '10px 16px',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
               }}
             >
               <div>
-                <span style={{ fontSize: 12, color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                <span style={{ fontSize: 11, color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                   {language === 'th' ? 'ยอดที่ต้องชำระทั้งหมด' : 'Total Amount Due'}
                 </span>
-                <div style={{ fontSize: 32, fontWeight: 800, color: '#fff', fontFamily: 'var(--font-mono)' }}>
+                <div style={{ fontSize: 26, fontWeight: 800, color: '#fff', fontFamily: 'var(--font-mono)' }}>
                   ฿{grandTotal.toLocaleString()}
                 </div>
               </div>
@@ -298,145 +353,168 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose }) =
             </div>
 
             {/* Payment Method Selector Tabs */}
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(3, 1fr)',
-                gap: 10,
-              }}
-            >
-              <button
-                type="button"
-                onClick={() => setPaymentMethod('promptpay')}
-                className="touch-btn"
+            {availableMethods.length === 0 ? (
+              <div
                 style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 8,
-                  padding: '14px 10px',
-                  borderRadius: 'var(--radius-md)',
-                  border: '2px solid ' + (paymentMethod === 'promptpay' ? '#3b82f6' : 'var(--color-border)'),
-                  background: paymentMethod === 'promptpay' ? 'rgba(59, 130, 246, 0.15)' : 'var(--color-bg-elevated)',
-                  color: paymentMethod === 'promptpay' ? '#60a5fa' : 'var(--color-text-secondary)',
-                  cursor: 'pointer',
-                  transition: 'all 0.15s',
+                  background: 'rgba(239, 68, 68, 0.1)',
+                  border: '1px solid rgba(239, 68, 68, 0.3)',
+                  borderRadius: 8,
+                  padding: '16px 20px',
+                  color: '#f87171',
+                  textAlign: 'center',
+                  fontSize: 13,
+                  fontWeight: 700,
                 }}
               >
-                <QrCode size={24} />
-                <span style={{ fontSize: 13, fontWeight: 700 }}>PromptPay QR</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setPaymentMethod('cash')}
-                className="touch-btn"
+                ⚠️ ยังไม่ได้เปิดใช้งานช่องทางชำระเงินใดๆ กรุณาเข้าไปเปิดใช้งานในหน้า "ตั้งค่าระบบ (Settings)"
+              </div>
+            ) : (
+              <div
                 style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 8,
-                  padding: '14px 10px',
-                  borderRadius: 'var(--radius-md)',
-                  border: '2px solid ' + (paymentMethod === 'cash' ? '#10b981' : 'var(--color-border)'),
-                  background: paymentMethod === 'cash' ? 'rgba(16, 185, 129, 0.15)' : 'var(--color-bg-elevated)',
-                  color: paymentMethod === 'cash' ? '#34d399' : 'var(--color-text-secondary)',
-                  cursor: 'pointer',
-                  transition: 'all 0.15s',
+                  display: 'grid',
+                  gridTemplateColumns: `repeat(${availableMethods.length}, 1fr)`,
+                  gap: 10,
                 }}
               >
-                <Banknote size={24} />
-                <span style={{ fontSize: 13, fontWeight: 700 }}>
-                  {language === 'th' ? 'เงินสด (Cash)' : 'Cash'}
-                </span>
-              </button>
+                {availableMethods.map((m) => {
+                  const isSelected = paymentMethod === m.id;
+                  return (
+                    <button
+                      key={m.id}
+                      type="button"
+                      onClick={() => setPaymentMethod(m.id)}
+                      className="touch-btn"
+                      style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 8,
+                        padding: '14px 10px',
+                        borderRadius: 'var(--radius-md)',
+                        border: '2px solid ' + (isSelected ? m.border : 'var(--color-border)'),
+                        background: isSelected ? m.bg : 'var(--color-bg-elevated)',
+                        color: isSelected ? m.color : 'var(--color-text-secondary)',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s',
+                      }}
+                    >
+                      {m.icon}
+                      <span style={{ fontSize: 13, fontWeight: 700 }}>
+                        {language === 'th' ? m.labelTh : m.labelEn}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
 
-              <button
-                type="button"
-                onClick={() => setPaymentMethod('card')}
-                className="touch-btn"
-                style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 8,
-                  padding: '14px 10px',
-                  borderRadius: 'var(--radius-md)',
-                  border: '2px solid ' + (paymentMethod === 'card' ? 'var(--color-primary)' : 'var(--color-border)'),
-                  background: paymentMethod === 'card' ? 'rgba(245, 158, 11, 0.15)' : 'var(--color-bg-elevated)',
-                  color: paymentMethod === 'card' ? 'var(--color-primary)' : 'var(--color-text-secondary)',
-                  cursor: 'pointer',
-                  transition: 'all 0.15s',
-                }}
-              >
-                <CreditCard size={24} />
-                <span style={{ fontSize: 13, fontWeight: 700 }}>
-                  {language === 'th' ? 'บัตรเครดิต/เดบิต' : 'Card'}
-                </span>
-              </button>
-            </div>
-
-            {/* PromptPay QR View */}
+            {/* PromptPay / QR Scan View */}
             {paymentMethod === 'promptpay' && (
               <div
                 style={{
                   background: 'var(--color-bg-elevated)',
                   borderRadius: 'var(--radius-lg)',
-                  padding: 20,
+                  padding: 14,
                   display: 'flex',
                   flexDirection: 'column',
                   alignItems: 'center',
                   textAlign: 'center',
-                  gap: 14,
+                  gap: 10,
                   border: '1px solid rgba(59, 130, 246, 0.3)',
                 }}
               >
-                {/* PromptPay Official Branding Banner */}
+                {/* Branding Banner */}
                 <div
                   style={{
-                    background: '#002d62',
+                    background: isCustomQr ? '#1e293b' : '#002d62',
+                    border: '1px solid ' + (isCustomQr ? '#3b82f6' : 'transparent'),
                     color: '#fff',
-                    padding: '6px 20px',
+                    padding: '4px 16px',
                     borderRadius: 'var(--radius-md)',
                     display: 'flex',
                     alignItems: 'center',
-                    gap: 8,
+                    gap: 6,
                   }}
                 >
-                  <span style={{ fontSize: 14, fontWeight: 800, letterSpacing: '0.04em' }}>พร้อมเพย์ PROMPTPAY</span>
+                  <span style={{ fontSize: 13, fontWeight: 800, letterSpacing: '0.04em' }}>
+                    {isCustomQr ? `สแกน QR (${paymentChannels.scan.bankName || 'ธนาคาร'})` : 'พร้อมเพย์ PROMPTPAY'}
+                  </span>
                 </div>
 
-                {/* QR Canvas */}
-                <div
-                  style={{
-                    background: '#fff',
-                    padding: 10,
-                    borderRadius: 12,
-                    boxShadow: '0 4px 16px rgba(0,0,0,0.3)',
-                  }}
-                >
-                  <canvas ref={canvasRef} style={{ display: 'block' }} />
-                </div>
+                {/* QR Code Container: Custom Uploaded Image vs Dynamic Canvas */}
+                {isCustomQr ? (
+                  <div
+                    style={{
+                      background: '#fff',
+                      padding: 8,
+                      borderRadius: 10,
+                      boxShadow: '0 4px 16px rgba(0,0,0,0.3)',
+                      maxWidth: 170,
+                      maxHeight: 170,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <img
+                      src={paymentChannels.scan.customQrUrl}
+                      alt="Merchant Payment QR"
+                      style={{
+                        maxWidth: 154,
+                        maxHeight: 154,
+                        objectFit: 'contain',
+                        borderRadius: 6,
+                        display: 'block',
+                      }}
+                    />
+                  </div>
+                ) : (
+                  <div
+                    style={{
+                      background: '#fff',
+                      padding: 8,
+                      borderRadius: 10,
+                      boxShadow: '0 4px 14px rgba(0,0,0,0.3)',
+                    }}
+                  >
+                    <canvas ref={canvasRef} style={{ display: 'block' }} />
+                  </div>
+                )}
 
-                {/* Merchant PromptPay Info */}
-                <div style={{ fontSize: 13, color: 'var(--color-text-secondary)', display: 'flex', flexDirection: 'column', gap: 4 }}>
-                  <div style={{ fontWeight: 700, color: '#fff' }}>{settings.promptPayName}</div>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-                    <span style={{ fontFamily: 'var(--font-mono)' }}>PromptPay ID: {settings.promptPayId}</span>
+                {/* Merchant Account & PromptPay Info */}
+                <div style={{ fontSize: 13, color: 'var(--color-text-secondary)', display: 'flex', flexDirection: 'column', gap: 4, width: '100%' }}>
+                  <div style={{ fontWeight: 700, color: '#fff', fontSize: 14 }}>{scanAccountName}</div>
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 8,
+                      background: 'rgba(255, 255, 255, 0.05)',
+                      padding: '4px 12px',
+                      borderRadius: 6,
+                      margin: '0 auto',
+                      width: 'fit-content',
+                    }}
+                  >
+                    <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: '#60a5fa' }}>
+                      {paymentChannels.scan.bankName ? `${paymentChannels.scan.bankName}: ` : 'เลขที่บัญชี: '}
+                      {scanAccountNo}
+                    </span>
                     <button
+                      type="button"
                       onClick={handleCopyPromptPay}
-                      style={{ background: 'transparent', border: 'none', color: 'var(--color-primary)', cursor: 'pointer' }}
+                      title="คัดลอกเลขบัญชี"
+                      style={{ background: 'transparent', border: 'none', color: 'var(--color-primary)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
                     >
                       {copiedPromptPay ? <Check size={14} /> : <Copy size={14} />}
                     </button>
                   </div>
                   <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 2 }}>
                     {language === 'th'
-                      ? 'สแกนจ่ายได้ทุกแอปธนาคารไทย (K PLUS, SCB EASY, Krungthai NEXT ฯลฯ)'
-                      : 'Scan to pay with any Thai mobile banking app'}
+                      ? `สแกนจ่ายยอด ฿${grandTotal.toLocaleString()} ได้ทุกแอปธนาคารไทย (K PLUS, SCB EASY, Krungthai NEXT ฯลฯ)`
+                      : `Scan to pay ฿${grandTotal.toLocaleString()} with any Thai mobile banking app`}
                   </div>
                 </div>
               </div>
@@ -469,35 +547,37 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose }) =
                 </div>
 
                 {/* Quick Tender Shortcuts */}
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                  <button
-                    type="button"
-                    onClick={() => handleQuickCash(grandTotal)}
-                    className="btn-secondary"
-                    style={{ flex: 1, padding: '10px 8px', fontSize: 13, fontWeight: 700 }}
-                  >
-                    {language === 'th' ? 'พอดี' : 'Exact'} (฿{grandTotal})
-                  </button>
-                  {[100, 500, 1000].map((denom) => (
+                {paymentChannels.cash?.allowQuickDenominations !== false && (
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                     <button
-                      key={denom}
                       type="button"
-                      onClick={() => handleQuickCash(denom)}
+                      onClick={() => handleQuickCash(grandTotal)}
                       className="btn-secondary"
                       style={{ flex: 1, padding: '10px 8px', fontSize: 13, fontWeight: 700 }}
                     >
-                      ฿{denom}
+                      {language === 'th' ? 'พอดี' : 'Exact'} (฿{grandTotal})
                     </button>
-                  ))}
-                  <button
-                    type="button"
-                    onClick={() => handleAddDenomination(100)}
-                    className="btn-secondary"
-                    style={{ padding: '10px 14px', fontSize: 12 }}
-                  >
-                    +100
-                  </button>
-                </div>
+                    {[100, 500, 1000].map((denom) => (
+                      <button
+                        key={denom}
+                        type="button"
+                        onClick={() => handleQuickCash(denom)}
+                        className="btn-secondary"
+                        style={{ flex: 1, padding: '10px 8px', fontSize: 13, fontWeight: 700 }}
+                      >
+                        ฿{denom}
+                      </button>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={() => handleAddDenomination(100)}
+                      className="btn-secondary"
+                      style={{ padding: '10px 14px', fontSize: 12 }}
+                    >
+                      +100
+                    </button>
+                  </div>
+                )}
 
                 {/* Change Due Box */}
                 <div
@@ -531,34 +611,62 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose }) =
             {/* Card Info View */}
             {paymentMethod === 'card' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                {/* Gateway Status Badge */}
+                <div
+                  style={{
+                    background: 'rgba(245, 158, 11, 0.1)',
+                    border: '1px solid rgba(245, 158, 11, 0.3)',
+                    borderRadius: 8,
+                    padding: '10px 14px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <CreditCard size={18} style={{ color: 'var(--color-primary)' }} />
+                    <span style={{ fontSize: 13, fontWeight: 700, color: '#fff' }}>
+                      {paymentChannels.card?.gatewayType === 'edc_terminal'
+                        ? 'เครื่องรูดบัตร EDC (EDC Terminal)'
+                        : `Payment Gateway: ${paymentChannels.card?.gatewayType.toUpperCase()}`}
+                    </span>
+                  </div>
+                  {paymentChannels.card?.terminalId && (
+                    <span style={{ fontSize: 11, color: 'var(--color-primary)', fontFamily: 'var(--font-mono)', fontWeight: 700 }}>
+                      ID: {paymentChannels.card.terminalId}
+                    </span>
+                  )}
+                </div>
+
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                   <label style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-secondary)' }}>
-                    {language === 'th' ? 'เลขท้ายบัตร 4 หลัก (บันทึกอ้างอิง)' : 'Card Last 4 Digits (Reference)'}
+                    {language === 'th' ? 'เลขท้ายบัตร 4 หลัก / รหัสสลิป EDC (บันทึกอ้างอิง)' : 'Card Last 4 Digits / Slip Approval (Reference)'}
                   </label>
                   <input
                     type="text"
-                    maxLength={4}
+                    maxLength={6}
                     value={cardLast4}
-                    onChange={(e) => setCardLast4(e.target.value.replace(/[^0-9]/g, ''))}
-                    placeholder="e.g. 4242"
+                    onChange={(e) => setCardLast4(e.target.value)}
+                    placeholder="e.g. 4242 หรือ 882194"
                     style={{
                       background: 'var(--color-bg-elevated)',
                       border: '1px solid var(--color-border)',
                       borderRadius: 'var(--radius-md)',
                       color: '#fff',
-                      fontSize: 22,
+                      fontSize: 20,
                       fontWeight: 700,
                       fontFamily: 'var(--font-mono)',
                       padding: '12px 16px',
-                      letterSpacing: '0.2em',
+                      letterSpacing: '0.1em',
                       outline: 'none',
                     }}
                   />
                 </div>
-                <div style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>
+
+                <div style={{ fontSize: 12, color: 'var(--color-text-muted)', lineHeight: 1.4 }}>
                   {language === 'th'
-                    ? 'รองรับบัตร VISA, Mastercard, JCB, UnionPay ผ่านเครื่องรูดบัตร EDC'
-                    : 'Supports VISA, Mastercard, JCB, UnionPay via EDC Terminal'}
+                    ? 'รองรับบัตร VISA, Mastercard, JCB, UnionPay • ทำรายการผ่านเครื่อง EDC แล้วกดยืนยันการชำระเงิน'
+                    : 'Supports VISA, Mastercard, JCB, UnionPay • Process on EDC then confirm payment'}
                 </div>
               </div>
             )}

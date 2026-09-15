@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { usePOS } from '../../context/POSContext';
 import {
   TrendingUp,
@@ -17,14 +17,28 @@ import {
   Receipt,
   Wallet,
   Users,
+  Clock,
+  CreditCard,
+  Upload,
+  Trash2,
+  Eye,
+  EyeOff,
+  Bot,
+  Key,
 } from 'lucide-react';
-import type { MenuItem, AdminSubTab } from '../../types/pos';
+import type { MenuItem, AdminSubTab, RestaurantSettings, CardGatewayType } from '../../types/pos';
 import { BillLogs } from './BillLogs';
 import { FinancingPanel } from './FinancingPanel';
 import { EmployeePanel } from './EmployeePanel';
+import { ShiftManagePage } from './ShiftManagePage';
+import { ProcurementPanel } from './ProcurementPanel';
+import { AccountingApiPanel } from './AccountingApiPanel';
 
 const sidebarTabs: { id: AdminSubTab; icon: React.ReactNode; labelTh: string; labelEn: string; ownerOnly?: boolean }[] = [
   { id: 'dashboard', icon: <TrendingUp size={16} />, labelTh: 'ภาพรวม & ยอดขาย', labelEn: 'Dashboard', ownerOnly: true },
+  { id: 'procurement', icon: <Bot size={16} />, labelTh: 'จัดซื้อ & LINE Agent', labelEn: 'Procurement & LINE Agent' },
+  { id: 'api_keys', icon: <Key size={16} />, labelTh: 'API Key & โปรแกรมบัญชี', labelEn: 'API Keys & Accounting', ownerOnly: true },
+  { id: 'shifts', icon: <Clock size={16} />, labelTh: 'จัดการกะ', labelEn: 'Manage Shifts' },
   { id: 'bills', icon: <Receipt size={16} />, labelTh: 'ประวัติบิลทั้งหมด', labelEn: 'Bill Logs' },
   { id: 'menu', icon: <Utensils size={16} />, labelTh: 'จัดการเมนูอาหาร', labelEn: 'Menu Catalog' },
   { id: 'financing', icon: <Wallet size={16} />, labelTh: 'การเงิน & กะ', labelEn: 'Financing' },
@@ -50,18 +64,118 @@ export const AdminDashboard: React.FC = () => {
     currentStaff,
   } = usePOS();
 
+  // If staff is not owner/admin and is currently on an owner-only tab, switch to 'shifts'
+  useEffect(() => {
+    const isOwnerOrAdmin = currentStaff?.role === 'owner' || currentStaff?.role === 'admin';
+    const ownerTabs: AdminSubTab[] = ['dashboard', 'employees', 'settings'];
+    if (!isOwnerOrAdmin && ownerTabs.includes(adminSubTab)) {
+      setAdminSubTab('shifts');
+    }
+  }, [currentStaff, adminSubTab, setAdminSubTab]);
+
   const activeTab = adminSubTab;
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
   const [isAddingNew, setIsAddingNew] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [showSecretKey, setShowSecretKey] = useState(false);
 
-  // Settings form state
-  const [settingsForm, setSettingsForm] = useState(() => ({ ...settings }));
+  // Settings form state with full paymentChannels structure
+  const [settingsForm, setSettingsForm] = useState<RestaurantSettings>(() => ({
+    ...settings,
+    paymentChannels: {
+      cash: {
+        enabled: true,
+        allowQuickDenominations: true,
+        ...(settings.paymentChannels?.cash || {}),
+      },
+      scan: {
+        enabled: true,
+        accountName: settings.promptPayName || 'นาย สมชาย บุญรอด (ตุ๋นมัน)',
+        accountNumber: settings.promptPayId || '0819876543',
+        bankName: settings.paymentChannels?.scan?.bankName || 'PromptPay',
+        qrType: settings.paymentChannels?.scan?.qrType || 'generated',
+        customQrUrl: settings.paymentChannels?.scan?.customQrUrl || '',
+        ...(settings.paymentChannels?.scan || {}),
+      },
+      card: {
+        enabled: true,
+        gatewayType: (settings.paymentChannels?.card?.gatewayType || 'edc_terminal') as CardGatewayType,
+        terminalId: settings.paymentChannels?.card?.terminalId || 'EDC-882194',
+        merchantId: settings.paymentChannels?.card?.merchantId || 'MERCHANT-TH-001',
+        apiKey: settings.paymentChannels?.card?.apiKey || '',
+        secretKey: settings.paymentChannels?.card?.secretKey || '',
+        feePercentage: settings.paymentChannels?.card?.feePercentage ?? 2.5,
+        passFeeToCustomer: settings.paymentChannels?.card?.passFeeToCustomer ?? false,
+        ...(settings.paymentChannels?.card || {}),
+      },
+    },
+  }));
+
+  // Update settingsForm when context settings change
+  useEffect(() => {
+    setSettingsForm((prev) => ({
+      ...settings,
+      paymentChannels: {
+        cash: {
+          enabled: true,
+          allowQuickDenominations: true,
+          ...(settings.paymentChannels?.cash || prev.paymentChannels?.cash || {}),
+        },
+        scan: {
+          enabled: true,
+          accountName: settings.promptPayName || 'นาย สมชาย บุญรอด (ตุ๋นมัน)',
+          accountNumber: settings.promptPayId || '0819876543',
+          bankName: settings.paymentChannels?.scan?.bankName || prev.paymentChannels?.scan?.bankName || 'PromptPay',
+          qrType: settings.paymentChannels?.scan?.qrType || prev.paymentChannels?.scan?.qrType || 'generated',
+          customQrUrl: settings.paymentChannels?.scan?.customQrUrl || prev.paymentChannels?.scan?.customQrUrl || '',
+          ...(settings.paymentChannels?.scan || prev.paymentChannels?.scan || {}),
+        },
+        card: {
+          enabled: true,
+          gatewayType: (settings.paymentChannels?.card?.gatewayType || prev.paymentChannels?.card?.gatewayType || 'edc_terminal') as CardGatewayType,
+          terminalId: settings.paymentChannels?.card?.terminalId || prev.paymentChannels?.card?.terminalId || 'EDC-882194',
+          merchantId: settings.paymentChannels?.card?.merchantId || prev.paymentChannels?.card?.merchantId || 'MERCHANT-TH-001',
+          apiKey: settings.paymentChannels?.card?.apiKey || prev.paymentChannels?.card?.apiKey || '',
+          secretKey: settings.paymentChannels?.card?.secretKey || prev.paymentChannels?.card?.secretKey || '',
+          feePercentage: settings.paymentChannels?.card?.feePercentage ?? prev.paymentChannels?.card?.feePercentage ?? 2.5,
+          passFeeToCustomer: settings.paymentChannels?.card?.passFeeToCustomer ?? prev.paymentChannels?.card?.passFeeToCustomer ?? false,
+          ...(settings.paymentChannels?.card || prev.paymentChannels?.card || {}),
+        },
+      },
+    }));
+  }, [settings]);
 
   const handleSaveSettings = () => {
-    updateSettings(settingsForm);
+    // Keep promptPayId and promptPayName synced with scan channel
+    const toSave = {
+      ...settingsForm,
+      promptPayId: settingsForm.paymentChannels?.scan.accountNumber || settingsForm.promptPayId,
+      promptPayName: settingsForm.paymentChannels?.scan.accountName || settingsForm.promptPayName,
+    };
+    updateSettings(toSave);
     setSaveSuccess(true);
     setTimeout(() => setSaveSuccess(false), 2500);
+  };
+
+  const handleCustomQrUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const base64 = event.target?.result as string;
+      setSettingsForm((prev) => ({
+        ...prev,
+        paymentChannels: {
+          ...prev.paymentChannels!,
+          scan: {
+            ...prev.paymentChannels!.scan,
+            qrType: 'custom_image',
+            customQrUrl: base64,
+          },
+        },
+      }));
+    };
+    reader.readAsDataURL(file);
   };
 
   // New item form state
@@ -823,22 +937,12 @@ export const AdminDashboard: React.FC = () => {
                   />
                 </div>
 
-                <div>
-                  <label style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>เบอร์มือถือหรือเลข Tax ID สำหรับพร้อมเพย์</label>
+                <div style={{ gridColumn: '1 / -1' }}>
+                  <label style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>ที่อยู่ร้าน (ภาษาไทย)</label>
                   <input
                     type="text"
-                    value={settingsForm.promptPayId}
-                    onChange={(e) => setSettingsForm({ ...settingsForm, promptPayId: e.target.value })}
-                    style={{ width: '100%', padding: '10px', background: 'var(--color-bg-elevated)', border: '1px solid var(--color-border)', borderRadius: 6, color: '#fff', marginTop: 4 }}
-                  />
-                </div>
-
-                <div>
-                  <label style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>ชื่อบัญชีพร้อมเพย์</label>
-                  <input
-                    type="text"
-                    value={settingsForm.promptPayName}
-                    onChange={(e) => setSettingsForm({ ...settingsForm, promptPayName: e.target.value })}
+                    value={settingsForm.addressTh || ''}
+                    onChange={(e) => setSettingsForm({ ...settingsForm, addressTh: e.target.value })}
                     style={{ width: '100%', padding: '10px', background: 'var(--color-bg-elevated)', border: '1px solid var(--color-border)', borderRadius: 6, color: '#fff', marginTop: 4 }}
                   />
                 </div>
@@ -853,27 +957,874 @@ export const AdminDashboard: React.FC = () => {
                   />
                 </div>
               </div>
+            </div>
+
+            {/* Section 3: Payment Channels & Gateway Settings (ช่องทางจัดการเงิน) */}
+            <div
+              style={{
+                background: 'var(--color-bg-card)',
+                border: '1px solid var(--color-border)',
+                borderRadius: 'var(--radius-lg)',
+                padding: 24,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 22,
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, borderBottom: '1px solid var(--color-border)', paddingBottom: 14 }}>
+                <div
+                  style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: 8,
+                    background: 'rgba(16, 185, 129, 0.15)',
+                    color: '#34d399',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <CreditCard size={20} />
+                </div>
+                <div>
+                  <h3 style={{ fontSize: 17, fontWeight: 800, color: '#fff', margin: 0 }}>
+                    {language === 'th' ? 'ช่องทางรับชำระเงิน & เกตเวย์ (Payment Channels & Gateways)' : 'Payment Channels & Gateways'}
+                  </h3>
+                  <p style={{ fontSize: 12, color: 'var(--color-text-secondary)', margin: '2px 0 0' }}>
+                    {language === 'th'
+                      ? 'เปิด-ปิดช่องทางรับเงิน (เงินสด, สแกน QR / พร้อมเพย์, บัตรเครดิต EDC / Online Gateway) พร้อมระบบอัปโหลดรูป QR และเชื่อมต่อ Payment Gateway'
+                      : 'Toggle channels, configure QR scan / PromptPay upload, and setup card payment gateways'}
+                  </p>
+                </div>
+              </div>
+
+              {/* 3 Quick Channel Overview Cards */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14 }}>
+                {/* 1. Cash Card */}
+                <div
+                  style={{
+                    background: 'var(--color-bg-elevated)',
+                    border: '1.5px solid ' + (settingsForm.paymentChannels?.cash.enabled ? 'rgba(16, 185, 129, 0.4)' : 'var(--color-border)'),
+                    borderRadius: 'var(--radius-md)',
+                    padding: 16,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 12,
+                    position: 'relative',
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <div
+                        style={{
+                          width: 32,
+                          height: 32,
+                          borderRadius: 8,
+                          background: 'rgba(16, 185, 129, 0.15)',
+                          color: '#34d399',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}
+                      >
+                        <Banknote size={18} />
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 14, fontWeight: 700, color: '#fff' }}>เงินสด (Cash)</div>
+                        <div style={{ fontSize: 11, color: settingsForm.paymentChannels?.cash.enabled ? '#34d399' : 'var(--color-text-muted)' }}>
+                          {settingsForm.paymentChannels?.cash.enabled ? '● เปิดใช้งาน' : '○ ปิดใช้งาน'}
+                        </div>
+                      </div>
+                    </div>
+
+                    <label style={{ position: 'relative', display: 'inline-block', width: 44, height: 24, cursor: 'pointer' }}>
+                      <input
+                        type="checkbox"
+                        checked={settingsForm.paymentChannels?.cash.enabled ?? true}
+                        onChange={(e) =>
+                          setSettingsForm({
+                            ...settingsForm,
+                            paymentChannels: {
+                              ...settingsForm.paymentChannels!,
+                              cash: {
+                                ...settingsForm.paymentChannels!.cash,
+                                enabled: e.target.checked,
+                              },
+                            },
+                          })
+                        }
+                        style={{ opacity: 0, width: 0, height: 0 }}
+                      />
+                      <span
+                        style={{
+                          position: 'absolute',
+                          inset: 0,
+                          backgroundColor: settingsForm.paymentChannels?.cash.enabled ? '#10b981' : 'rgba(255, 255, 255, 0.15)',
+                          borderRadius: 24,
+                          transition: '0.2s',
+                        }}
+                      >
+                        <span
+                          style={{
+                            position: 'absolute',
+                            content: '""',
+                            height: 18,
+                            width: 18,
+                            left: settingsForm.paymentChannels?.cash.enabled ? 23 : 3,
+                            bottom: 3,
+                            backgroundColor: '#fff',
+                            borderRadius: '50%',
+                            transition: '0.2s',
+                          }}
+                        />
+                      </span>
+                    </label>
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--color-text-muted)', lineHeight: 1.4 }}>
+                    รับเงินสดหน้าเคาน์เตอร์ คำนวณเงินทอนอัตโนมัติ และบันทึกเข้าเก๊ะเงินทอน
+                  </div>
+                </div>
+
+                {/* 2. Scan / PromptPay Card */}
+                <div
+                  style={{
+                    background: 'var(--color-bg-elevated)',
+                    border: '1.5px solid ' + (settingsForm.paymentChannels?.scan.enabled ? 'rgba(59, 130, 246, 0.4)' : 'var(--color-border)'),
+                    borderRadius: 'var(--radius-md)',
+                    padding: 16,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 12,
+                    position: 'relative',
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <div
+                        style={{
+                          width: 32,
+                          height: 32,
+                          borderRadius: 8,
+                          background: 'rgba(59, 130, 246, 0.15)',
+                          color: '#60a5fa',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}
+                      >
+                        <QrCode size={18} />
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 14, fontWeight: 700, color: '#fff' }}>สแกน QR / พร้อมเพย์</div>
+                        <div style={{ fontSize: 11, color: settingsForm.paymentChannels?.scan.enabled ? '#60a5fa' : 'var(--color-text-muted)' }}>
+                          {settingsForm.paymentChannels?.scan.enabled ? '● เปิดใช้งาน' : '○ ปิดใช้งาน'}
+                        </div>
+                      </div>
+                    </div>
+
+                    <label style={{ position: 'relative', display: 'inline-block', width: 44, height: 24, cursor: 'pointer' }}>
+                      <input
+                        type="checkbox"
+                        checked={settingsForm.paymentChannels?.scan.enabled ?? true}
+                        onChange={(e) =>
+                          setSettingsForm({
+                            ...settingsForm,
+                            paymentChannels: {
+                              ...settingsForm.paymentChannels!,
+                              scan: {
+                                ...settingsForm.paymentChannels!.scan,
+                                enabled: e.target.checked,
+                              },
+                            },
+                          })
+                        }
+                        style={{ opacity: 0, width: 0, height: 0 }}
+                      />
+                      <span
+                        style={{
+                          position: 'absolute',
+                          inset: 0,
+                          backgroundColor: settingsForm.paymentChannels?.scan.enabled ? '#3b82f6' : 'rgba(255, 255, 255, 0.15)',
+                          borderRadius: 24,
+                          transition: '0.2s',
+                        }}
+                      >
+                        <span
+                          style={{
+                            position: 'absolute',
+                            content: '""',
+                            height: 18,
+                            width: 18,
+                            left: settingsForm.paymentChannels?.scan.enabled ? 23 : 3,
+                            bottom: 3,
+                            backgroundColor: '#fff',
+                            borderRadius: '50%',
+                            transition: '0.2s',
+                          }}
+                        />
+                      </span>
+                    </label>
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--color-text-muted)', lineHeight: 1.4 }}>
+                    {settingsForm.paymentChannels?.scan.qrType === 'custom_image' ? '🖼️ แสดงรูปภาพ QR ที่อัปโหลด' : '⚡ สร้าง PromptPay QR ยอดตรงอัตโนมัติ'}
+                  </div>
+                </div>
+
+                {/* 3. Card & Gateway Card */}
+                <div
+                  style={{
+                    background: 'var(--color-bg-elevated)',
+                    border: '1.5px solid ' + (settingsForm.paymentChannels?.card.enabled ? 'rgba(245, 158, 11, 0.4)' : 'var(--color-border)'),
+                    borderRadius: 'var(--radius-md)',
+                    padding: 16,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 12,
+                    position: 'relative',
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <div
+                        style={{
+                          width: 32,
+                          height: 32,
+                          borderRadius: 8,
+                          background: 'rgba(245, 158, 11, 0.15)',
+                          color: 'var(--color-primary)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}
+                      >
+                        <CreditCard size={18} />
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 14, fontWeight: 700, color: '#fff' }}>บัตรเครดิต & เกตเวย์</div>
+                        <div style={{ fontSize: 11, color: settingsForm.paymentChannels?.card.enabled ? 'var(--color-primary)' : 'var(--color-text-muted)' }}>
+                          {settingsForm.paymentChannels?.card.enabled ? '● เปิดใช้งาน' : '○ ปิดใช้งาน'}
+                        </div>
+                      </div>
+                    </div>
+
+                    <label style={{ position: 'relative', display: 'inline-block', width: 44, height: 24, cursor: 'pointer' }}>
+                      <input
+                        type="checkbox"
+                        checked={settingsForm.paymentChannels?.card.enabled ?? true}
+                        onChange={(e) =>
+                          setSettingsForm({
+                            ...settingsForm,
+                            paymentChannels: {
+                              ...settingsForm.paymentChannels!,
+                              card: {
+                                ...settingsForm.paymentChannels!.card,
+                                enabled: e.target.checked,
+                              },
+                            },
+                          })
+                        }
+                        style={{ opacity: 0, width: 0, height: 0 }}
+                      />
+                      <span
+                        style={{
+                          position: 'absolute',
+                          inset: 0,
+                          backgroundColor: settingsForm.paymentChannels?.card.enabled ? 'var(--color-primary)' : 'rgba(255, 255, 255, 0.15)',
+                          borderRadius: 24,
+                          transition: '0.2s',
+                        }}
+                      >
+                        <span
+                          style={{
+                            position: 'absolute',
+                            content: '""',
+                            height: 18,
+                            width: 18,
+                            left: settingsForm.paymentChannels?.card.enabled ? 23 : 3,
+                            bottom: 3,
+                            backgroundColor: '#fff',
+                            borderRadius: '50%',
+                            transition: '0.2s',
+                          }}
+                        />
+                      </span>
+                    </label>
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--color-text-muted)', lineHeight: 1.4 }}>
+                    เกตเวย์: <strong style={{ color: '#fff' }}>{settingsForm.paymentChannels?.card.gatewayType.toUpperCase()}</strong> (ค่าธรรมเนียม {settingsForm.paymentChannels?.card.feePercentage}%)
+                  </div>
+                </div>
+              </div>
+
+              {/* Detailed Config Section: Scan Channel */}
+              {settingsForm.paymentChannels?.scan.enabled && (
+                <div
+                  style={{
+                    background: 'var(--color-bg-elevated)',
+                    border: '1px solid rgba(59, 130, 246, 0.3)',
+                    borderRadius: 'var(--radius-md)',
+                    padding: 20,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 16,
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid rgba(255, 255, 255, 0.08)', paddingBottom: 10 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <QrCode size={18} style={{ color: '#60a5fa' }} />
+                      <h4 style={{ fontSize: 15, fontWeight: 700, color: '#fff', margin: 0 }}>
+                        {language === 'th' ? 'ตั้งค่าบัญชีสแกนรับเงิน & รูป QR (Scan & QR Setup)' : 'Scan & QR Account Configuration'}
+                      </h4>
+                    </div>
+                    <span style={{ fontSize: 11, background: 'rgba(59, 130, 246, 0.15)', color: '#60a5fa', padding: '3px 8px', borderRadius: 6, fontWeight: 700 }}>
+                      Scan Channel Config
+                    </span>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14 }}>
+                    <div>
+                      <label style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>ธนาคาร / ผู้ให้บริการ</label>
+                      <select
+                        value={settingsForm.paymentChannels.scan.bankName}
+                        onChange={(e) =>
+                          setSettingsForm({
+                            ...settingsForm,
+                            paymentChannels: {
+                              ...settingsForm.paymentChannels!,
+                              scan: {
+                                ...settingsForm.paymentChannels!.scan,
+                                bankName: e.target.value,
+                              },
+                            },
+                          })
+                        }
+                        style={{ width: '100%', padding: '10px', background: 'var(--color-bg-card)', border: '1px solid var(--color-border)', borderRadius: 6, color: '#fff', marginTop: 4 }}
+                      >
+                        <option value="PromptPay">พร้อมเพย์ (PromptPay)</option>
+                        <option value="KBANK">ธนาคารกสิกรไทย (KBANK)</option>
+                        <option value="SCB">ธนาคารไทยพาณิชย์ (SCB)</option>
+                        <option value="BBL">ธนาคารกรุงเทพ (BBL)</option>
+                        <option value="KTB">ธนาคารกรุงไทย (KTB)</option>
+                        <option value="TTB">ธนาคารทหารไทยธนชาต (TTB)</option>
+                        <option value="GSB">ธนาคารออมสิน (GSB)</option>
+                        <option value="BAY">ธนาคารกรุงศรีอยุธยา (BAY)</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>ชื่อบัญชีรับเงิน (Account Name)</label>
+                      <input
+                        type="text"
+                        placeholder="เช่น นาย สมชาย บุญรอด (ตุ๋นมัน)"
+                        value={settingsForm.paymentChannels.scan.accountName}
+                        onChange={(e) =>
+                          setSettingsForm({
+                            ...settingsForm,
+                            promptPayName: e.target.value,
+                            paymentChannels: {
+                              ...settingsForm.paymentChannels!,
+                              scan: {
+                                ...settingsForm.paymentChannels!.scan,
+                                accountName: e.target.value,
+                              },
+                            },
+                          })
+                        }
+                        style={{ width: '100%', padding: '10px', background: 'var(--color-bg-card)', border: '1px solid var(--color-border)', borderRadius: 6, color: '#fff', marginTop: 4 }}
+                      />
+                    </div>
+
+                    <div>
+                      <label style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>เลขที่บัญชี / เบอร์พร้อมเพย์ (Account No. / PromptPay ID)</label>
+                      <input
+                        type="text"
+                        placeholder="เช่น 081-987-6543 หรือ 0105563089421"
+                        value={settingsForm.paymentChannels.scan.accountNumber}
+                        onChange={(e) =>
+                          setSettingsForm({
+                            ...settingsForm,
+                            promptPayId: e.target.value,
+                            paymentChannels: {
+                              ...settingsForm.paymentChannels!,
+                              scan: {
+                                ...settingsForm.paymentChannels!.scan,
+                                accountNumber: e.target.value,
+                              },
+                            },
+                          })
+                        }
+                        style={{ width: '100%', padding: '10px', background: 'var(--color-bg-card)', border: '1px solid var(--color-border)', borderRadius: 6, color: '#fff', marginTop: 4, fontFamily: 'var(--font-mono)' }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* QR Presentation Mode Selector */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10, paddingTop: 6 }}>
+                    <label style={{ fontSize: 13, fontWeight: 700, color: '#fff' }}>
+                      {language === 'th' ? 'รูปแบบการแสดงผล QR รับเงิน (QR Display Mode):' : 'QR Display Mode:'}
+                    </label>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                      {/* Mode A: Dynamic PromptPay */}
+                      <label
+                        style={{
+                          display: 'flex',
+                          alignItems: 'flex-start',
+                          gap: 12,
+                          padding: 14,
+                          background: settingsForm.paymentChannels.scan.qrType === 'generated' ? 'rgba(59, 130, 246, 0.15)' : 'var(--color-bg-card)',
+                          border: '1.5px solid ' + (settingsForm.paymentChannels.scan.qrType === 'generated' ? '#3b82f6' : 'var(--color-border)'),
+                          borderRadius: 8,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        <input
+                          type="radio"
+                          name="qrType"
+                          checked={settingsForm.paymentChannels.scan.qrType === 'generated'}
+                          onChange={() =>
+                            setSettingsForm({
+                              ...settingsForm,
+                              paymentChannels: {
+                                ...settingsForm.paymentChannels!,
+                                scan: {
+                                  ...settingsForm.paymentChannels!.scan,
+                                  qrType: 'generated',
+                                },
+                              },
+                            })
+                          }
+                          style={{ marginTop: 3, accentColor: '#3b82f6' }}
+                        />
+                        <div>
+                          <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <span>⚡ สร้าง QR พร้อมเพย์ยอดตรงอัตโนมัติ (Dynamic QR)</span>
+                          </div>
+                          <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginTop: 4, lineHeight: 1.4 }}>
+                            ระบบจะแปลงเลขพร้อมเพย์และยอดบิลแต่ละออเดอร์เป็น QR Code มาตรฐาน EMVCo ทันที ลูกค้าสแกนแล้วยอดเงินจะขึ้นตรงตามบิล
+                          </div>
+                        </div>
+                      </label>
+
+                      {/* Mode B: Custom Static QR Standee Upload */}
+                      <label
+                        style={{
+                          display: 'flex',
+                          alignItems: 'flex-start',
+                          gap: 12,
+                          padding: 14,
+                          background: settingsForm.paymentChannels.scan.qrType === 'custom_image' ? 'rgba(59, 130, 246, 0.15)' : 'var(--color-bg-card)',
+                          border: '1.5px solid ' + (settingsForm.paymentChannels.scan.qrType === 'custom_image' ? '#3b82f6' : 'var(--color-border)'),
+                          borderRadius: 8,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        <input
+                          type="radio"
+                          name="qrType"
+                          checked={settingsForm.paymentChannels.scan.qrType === 'custom_image'}
+                          onChange={() =>
+                            setSettingsForm({
+                              ...settingsForm,
+                              paymentChannels: {
+                                ...settingsForm.paymentChannels!,
+                                scan: {
+                                  ...settingsForm.paymentChannels!.scan,
+                                  qrType: 'custom_image',
+                                },
+                              },
+                            })
+                          }
+                          style={{ marginTop: 3, accentColor: '#3b82f6' }}
+                        />
+                        <div>
+                          <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <span>🖼️ อัปโหลดรูป QR รับเงินของร้าน (Custom QR Upload)</span>
+                          </div>
+                          <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginTop: 4, lineHeight: 1.4 }}>
+                            อัปโหลดไฟล์รูปภาพป้าย QR Code บัญชีธนาคารหรือแม่มณีของทางร้าน สำหรับแสดงให้ลูกค้าสแกนบนหน้าจอชำระเงิน
+                          </div>
+                        </div>
+                      </label>
+                    </div>
+
+                    {/* Custom QR Image Upload Box (shown if custom_image selected) */}
+                    {settingsForm.paymentChannels.scan.qrType === 'custom_image' && (
+                      <div
+                        style={{
+                          marginTop: 6,
+                          background: 'var(--color-bg-card)',
+                          border: '1px dashed rgba(59, 130, 246, 0.5)',
+                          borderRadius: 8,
+                          padding: 16,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 20,
+                        }}
+                      >
+                        {settingsForm.paymentChannels.scan.customQrUrl ? (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 16, width: '100%' }}>
+                            <div
+                              style={{
+                                width: 100,
+                                height: 100,
+                                borderRadius: 8,
+                                border: '1px solid var(--color-border)',
+                                overflow: 'hidden',
+                                background: '#fff',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                flexShrink: 0,
+                              }}
+                            >
+                              <img
+                                src={settingsForm.paymentChannels.scan.customQrUrl}
+                                alt="Custom QR Preview"
+                                style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                              />
+                            </div>
+
+                            <div style={{ flex: 1 }}>
+                              <div style={{ fontSize: 13, fontWeight: 700, color: '#34d399', display: 'flex', alignItems: 'center', gap: 6 }}>
+                                <Check size={16} />
+                                <span>อัปโหลดรูปภาพ QR รับเงินเรียบร้อยแล้ว</span>
+                              </div>
+                              <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginTop: 4 }}>
+                                รูปภาพนี้จะแสดงบนหน้าต่างรับชำระเงินเมื่อลูกค้าเลือกชำระด้วยการสแกน QR
+                              </div>
+
+                              <div style={{ display: 'flex', gap: 10, marginTop: 10 }}>
+                                <label
+                                  className="btn-secondary"
+                                  style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: 6,
+                                    padding: '6px 12px',
+                                    fontSize: 12,
+                                    cursor: 'pointer',
+                                  }}
+                                >
+                                  <Upload size={14} />
+                                  <span>เปลี่ยนรูปภาพ</span>
+                                  <input type="file" accept="image/*" onChange={handleCustomQrUpload} style={{ display: 'none' }} />
+                                </label>
+
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setSettingsForm({
+                                      ...settingsForm,
+                                      paymentChannels: {
+                                        ...settingsForm.paymentChannels!,
+                                        scan: {
+                                          ...settingsForm.paymentChannels!.scan,
+                                          customQrUrl: '',
+                                          qrType: 'generated',
+                                        },
+                                      },
+                                    })
+                                  }
+                                  style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: 6,
+                                    padding: '6px 12px',
+                                    fontSize: 12,
+                                    background: 'rgba(239, 68, 68, 0.15)',
+                                    color: '#f87171',
+                                    border: '1px solid rgba(239, 68, 68, 0.3)',
+                                    borderRadius: 6,
+                                    cursor: 'pointer',
+                                  }}
+                                >
+                                  <Trash2 size={14} />
+                                  <span>ลบรูปภาพ</span>
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        ) : (
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', width: '100%', padding: '12px 0', gap: 8 }}>
+                            <div
+                              style={{
+                                width: 44,
+                                height: 44,
+                                borderRadius: '50%',
+                                background: 'rgba(59, 130, 246, 0.15)',
+                                color: '#60a5fa',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                              }}
+                            >
+                              <Upload size={20} />
+                            </div>
+                            <div style={{ fontSize: 13, fontWeight: 700, color: '#fff' }}>
+                              คลิกเพื่อเลือกไฟล์รูปภาพ QR Code (PNG, JPG, WebP)
+                            </div>
+                            <div style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>
+                              แนะนำภาพสี่เหลี่ยมจัตุรัสที่มีความคมชัด เพื่อให้ลูกค้าสแกนได้สะดวกรวดเร็ว
+                            </div>
+                            <label
+                              className="btn-primary"
+                              style={{
+                                marginTop: 6,
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: 6,
+                                padding: '8px 16px',
+                                fontSize: 13,
+                                cursor: 'pointer',
+                              }}
+                            >
+                              <Upload size={15} />
+                              <span>เลือกรูปภาพ QR</span>
+                              <input type="file" accept="image/*" onChange={handleCustomQrUpload} style={{ display: 'none' }} />
+                            </label>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Detailed Config Section: Card Gateway */}
+              {settingsForm.paymentChannels?.card.enabled && (
+                <div
+                  style={{
+                    background: 'var(--color-bg-elevated)',
+                    border: '1px solid rgba(245, 158, 11, 0.3)',
+                    borderRadius: 'var(--radius-md)',
+                    padding: 20,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 16,
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid rgba(255, 255, 255, 0.08)', paddingBottom: 10 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <CreditCard size={18} style={{ color: 'var(--color-primary)' }} />
+                      <h4 style={{ fontSize: 15, fontWeight: 700, color: '#fff', margin: 0 }}>
+                        {language === 'th' ? 'ตั้งค่าเครื่องรูดบัตร EDC & เกตเวย์ชำระเงิน (Card Gateway Setup)' : 'Card Payment Gateway Setup'}
+                      </h4>
+                    </div>
+                    <span style={{ fontSize: 11, background: 'rgba(245, 158, 11, 0.15)', color: 'var(--color-primary)', padding: '3px 8px', borderRadius: 6, fontWeight: 700 }}>
+                      Card Gateway Config
+                    </span>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                    <div style={{ gridColumn: '1 / -1' }}>
+                      <label style={{ fontSize: 12, color: 'var(--color-text-secondary)', fontWeight: 600 }}>ผู้ให้บริการ Payment Gateway / เครื่อง EDC</label>
+                      <select
+                        value={settingsForm.paymentChannels.card.gatewayType}
+                        onChange={(e) =>
+                          setSettingsForm({
+                            ...settingsForm,
+                            paymentChannels: {
+                              ...settingsForm.paymentChannels!,
+                              card: {
+                                ...settingsForm.paymentChannels!.card,
+                                gatewayType: e.target.value as CardGatewayType,
+                              },
+                            },
+                          })
+                        }
+                        style={{ width: '100%', padding: '10px', background: 'var(--color-bg-card)', border: '1px solid var(--color-border)', borderRadius: 6, color: '#fff', marginTop: 4, fontWeight: 600 }}
+                      >
+                        <option value="edc_terminal">📟 เครื่องรูดบัตร EDC ประจำร้าน (EDC Terminal - Manual / Slip Ref)</option>
+                        <option value="kpayment">🟢 Kasikorn K-Payment Gateway (KBANK EDC / API)</option>
+                        <option value="omise">🟣 Omise / Opn Payments Gateway</option>
+                        <option value="stripe">💳 Stripe Payment Gateway</option>
+                        <option value="gbprimepay">🔵 GB Prime Pay Gateway</option>
+                        <option value="2c2p">🔶 2C2P Payment Gateway</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>Terminal ID / รหัสเครื่อง EDC</label>
+                      <input
+                        type="text"
+                        placeholder="เช่น EDC-882194 หรือ POS-T01"
+                        value={settingsForm.paymentChannels.card.terminalId || ''}
+                        onChange={(e) =>
+                          setSettingsForm({
+                            ...settingsForm,
+                            paymentChannels: {
+                              ...settingsForm.paymentChannels!,
+                              card: {
+                                ...settingsForm.paymentChannels!.card,
+                                terminalId: e.target.value,
+                              },
+                            },
+                          })
+                        }
+                        style={{ width: '100%', padding: '10px', background: 'var(--color-bg-card)', border: '1px solid var(--color-border)', borderRadius: 6, color: '#fff', marginTop: 4, fontFamily: 'var(--font-mono)' }}
+                      />
+                    </div>
+
+                    <div>
+                      <label style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>Merchant ID (รหัสร้านค้าของผู้ให้บริการ)</label>
+                      <input
+                        type="text"
+                        placeholder="เช่น MERCHANT-TH-001 หรือ 0105563089"
+                        value={settingsForm.paymentChannels.card.merchantId || ''}
+                        onChange={(e) =>
+                          setSettingsForm({
+                            ...settingsForm,
+                            paymentChannels: {
+                              ...settingsForm.paymentChannels!,
+                              card: {
+                                ...settingsForm.paymentChannels!.card,
+                                merchantId: e.target.value,
+                              },
+                            },
+                          })
+                        }
+                        style={{ width: '100%', padding: '10px', background: 'var(--color-bg-card)', border: '1px solid var(--color-border)', borderRadius: 6, color: '#fff', marginTop: 4, fontFamily: 'var(--font-mono)' }}
+                      />
+                    </div>
+
+                    {settingsForm.paymentChannels.card.gatewayType !== 'edc_terminal' && (
+                      <>
+                        <div>
+                          <label style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>Public Key / API Key</label>
+                          <input
+                            type="text"
+                            placeholder="pkey_test_..."
+                            value={settingsForm.paymentChannels.card.apiKey || ''}
+                            onChange={(e) =>
+                              setSettingsForm({
+                                ...settingsForm,
+                                paymentChannels: {
+                                  ...settingsForm.paymentChannels!,
+                                  card: {
+                                    ...settingsForm.paymentChannels!.card,
+                                    apiKey: e.target.value,
+                                  },
+                                },
+                              })
+                            }
+                            style={{ width: '100%', padding: '10px', background: 'var(--color-bg-card)', border: '1px solid var(--color-border)', borderRadius: 6, color: '#fff', marginTop: 4, fontFamily: 'var(--font-mono)' }}
+                          />
+                        </div>
+
+                        <div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <label style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>Secret Key / Private Key</label>
+                            <button
+                              type="button"
+                              onClick={() => setShowSecretKey(!showSecretKey)}
+                              style={{ background: 'transparent', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}
+                            >
+                              {showSecretKey ? <EyeOff size={13} /> : <Eye size={13} />}
+                              <span>{showSecretKey ? 'ซ่อน' : 'แสดง'}</span>
+                            </button>
+                          </div>
+                          <input
+                            type={showSecretKey ? 'text' : 'password'}
+                            placeholder="skey_test_..."
+                            value={settingsForm.paymentChannels.card.secretKey || ''}
+                            onChange={(e) =>
+                              setSettingsForm({
+                                ...settingsForm,
+                                paymentChannels: {
+                                  ...settingsForm.paymentChannels!,
+                                  card: {
+                                    ...settingsForm.paymentChannels!.card,
+                                    secretKey: e.target.value,
+                                  },
+                                },
+                              })
+                            }
+                            style={{ width: '100%', padding: '10px', background: 'var(--color-bg-card)', border: '1px solid var(--color-border)', borderRadius: 6, color: '#fff', marginTop: 4, fontFamily: 'var(--font-mono)' }}
+                          />
+                        </div>
+                      </>
+                    )}
+
+                    <div>
+                      <label style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>อัตราค่าธรรมเนียมรูดบัตร (MDR / Processing Fee %)</label>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
+                        <input
+                          type="number"
+                          step="0.1"
+                          min="0"
+                          max="10"
+                          value={settingsForm.paymentChannels.card.feePercentage ?? 2.5}
+                          onChange={(e) =>
+                            setSettingsForm({
+                              ...settingsForm,
+                              paymentChannels: {
+                                ...settingsForm.paymentChannels!,
+                                card: {
+                                  ...settingsForm.paymentChannels!.card,
+                                  feePercentage: parseFloat(e.target.value) || 0,
+                                },
+                              },
+                            })
+                          }
+                          style={{ width: 100, padding: '10px', background: 'var(--color-bg-card)', border: '1px solid var(--color-border)', borderRadius: 6, color: '#fff', fontFamily: 'var(--font-mono)', fontWeight: 700 }}
+                        />
+                        <span style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>%</span>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 22 }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, color: '#fff' }}>
+                        <input
+                          type="checkbox"
+                          checked={settingsForm.paymentChannels.card.passFeeToCustomer ?? false}
+                          onChange={(e) =>
+                            setSettingsForm({
+                              ...settingsForm,
+                              paymentChannels: {
+                                ...settingsForm.paymentChannels!,
+                                card: {
+                                  ...settingsForm.paymentChannels!.card,
+                                  passFeeToCustomer: e.target.checked,
+                                },
+                              },
+                            })
+                          }
+                          style={{ accentColor: 'var(--color-primary)' }}
+                        />
+                        <span>ส่งต่อค่าธรรมเนียมให้ลูกค้าชำระ (Surcharge)</span>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Save Button */}
-              <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 12, marginTop: 10 }}>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 12, marginTop: 14, paddingTop: 16, borderTop: '1px solid var(--color-border)' }}>
                 {saveSuccess && (
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#34d399', fontSize: 13, fontWeight: 700 }}>
                     <Check size={16} />
-                    <span>{language === 'th' ? 'บันทึกการตั้งค่าเรียบร้อยแล้ว!' : 'Settings saved!'}</span>
+                    <span>{language === 'th' ? 'บันทึกการตั้งค่าช่องทางชำระเงินเรียบร้อยแล้ว!' : 'Settings saved!'}</span>
                   </div>
                 )}
                 <button
                   type="button"
                   onClick={handleSaveSettings}
                   className="btn-primary"
-                  style={{ padding: '12px 28px', fontSize: 14, fontWeight: 800 }}
+                  style={{ padding: '12px 32px', fontSize: 14, fontWeight: 800 }}
                 >
-                  {language === 'th' ? 'บันทึกการตั้งค่า' : 'Save Settings'}
+                  {language === 'th' ? 'บันทึกการตั้งค่าทั้งหมด' : 'Save All Settings'}
                 </button>
               </div>
             </div>
           </div>
         )}
+
+        {activeTab === 'procurement' && <ProcurementPanel />}
+
+        {activeTab === 'api_keys' && <AccountingApiPanel />}
+
+        {activeTab === 'shifts' && <ShiftManagePage />}
 
         {activeTab === 'bills' && <BillLogs />}
 

@@ -14,6 +14,15 @@ import type {
   StaffUser,
   SelectedModifier,
   AdminSubTab,
+  Supplier,
+  InventoryItem,
+  POItem,
+  PurchaseOrder,
+  LineAgentConfig,
+  LineMessageLog,
+  ApiKey,
+  WebhookEndpoint,
+  AccountingIntegrationConfig,
 } from '../types/pos';
 import {
   initialCategories,
@@ -23,6 +32,15 @@ import {
   initialStaff,
   initialTables,
   initialActiveShift,
+  initialCompletedOrders,
+  initialSuppliers,
+  initialInventory,
+  initialPurchaseOrders,
+  initialLineAgentConfig,
+  initialLineLogs,
+  initialApiKeys,
+  initialWebhooks,
+  initialAccountingConfig,
 } from '../data/initialData';
 
 interface POSContextType {
@@ -84,6 +102,7 @@ interface POSContextType {
 
   // Cash Drawer & Shift
   currentShift: Shift;
+  shiftHistory: Shift[];
   cashTransactions: CashTransaction[];
   addCashTransaction: (type: 'pay_in' | 'pay_out', amount: number, reason: string) => void;
   closeShift: (actualCash: number, notes?: string) => void;
@@ -100,6 +119,36 @@ interface POSContextType {
   setActiveTab: (tab: 'pos' | 'tables' | 'orders' | 'admin' | 'kds') => void;
   adminSubTab: AdminSubTab;
   setAdminSubTab: (tab: AdminSubTab) => void;
+
+  // Procurement & LINE Agent
+  suppliers: Supplier[];
+  inventory: InventoryItem[];
+  purchaseOrders: PurchaseOrder[];
+  lineAgentConfig: LineAgentConfig;
+  lineLogs: LineMessageLog[];
+  addSupplier: (supplier: Omit<Supplier, 'id'>) => void;
+  updateSupplier: (supplier: Supplier) => void;
+  deleteSupplier: (supplierId: string) => void;
+  addInventoryItem: (item: Omit<InventoryItem, 'id'>) => void;
+  updateInventoryItem: (item: InventoryItem) => void;
+  deleteInventoryItem: (itemId: string) => void;
+  createPurchaseOrder: (po: Omit<PurchaseOrder, 'id' | 'poNumber' | 'createdAt' | 'createdBy' | 'status' | 'paymentStatus' | 'stockIngested'>) => PurchaseOrder;
+  sendPOToLineGroup: (poId: string) => void;
+  simulateSupplierLineReply: (poId: string, simulatedTotal?: number, isDiscrepancy?: boolean) => void;
+  approveAndPayPO: (poId: string) => void;
+  updateLineAgentConfig: (newConfig: Partial<LineAgentConfig>) => void;
+  triggerAutoPOForLowStock: (itemId: string) => void;
+
+  // API Keys & Accounting Program Connectors
+  apiKeys: ApiKey[];
+  webhooks: WebhookEndpoint[];
+  accountingConfig: AccountingIntegrationConfig;
+  generateApiKey: (name: string, permissions: ApiKey['permissions'], environment?: 'live' | 'test') => ApiKey;
+  revokeApiKey: (keyId: string) => void;
+  addWebhookEndpoint: (webhook: Omit<WebhookEndpoint, 'id'>) => void;
+  deleteWebhookEndpoint: (webhookId: string) => void;
+  updateAccountingConfig: (newCfg: Partial<AccountingIntegrationConfig>) => void;
+  triggerTestWebhook: (webhookId: string) => void;
 }
 
 const POSContext = createContext<POSContextType | undefined>(undefined);
@@ -124,7 +173,37 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
   }, []);
 
-  const [settings, setSettings] = useState<RestaurantSettings>(initialSettings);
+  const [settings, setSettings] = useState<RestaurantSettings>(() => {
+    const saved = localStorage.getItem(`${STORAGE_PREFIX}settings`);
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        return {
+          ...initialSettings,
+          ...parsed,
+          paymentChannels: {
+            ...initialSettings.paymentChannels,
+            ...(parsed.paymentChannels || {}),
+            cash: {
+              ...(initialSettings.paymentChannels?.cash || { enabled: true }),
+              ...(parsed.paymentChannels?.cash || {}),
+            },
+            scan: {
+              ...(initialSettings.paymentChannels?.scan || { enabled: true, accountName: '', accountNumber: '', bankName: 'PromptPay', qrType: 'generated' }),
+              ...(parsed.paymentChannels?.scan || {}),
+            },
+            card: {
+              ...(initialSettings.paymentChannels?.card || { enabled: true, gatewayType: 'edc_terminal' }),
+              ...(parsed.paymentChannels?.card || {}),
+            },
+          },
+        };
+      } catch (e) {
+        console.error('Error parsing settings from localStorage', e);
+      }
+    }
+    return initialSettings;
+  });
 
   const [staffUsers, setStaffUsers] = useState<StaffUser[]>(initialStaff);
   const [currentStaff, setCurrentStaff] = useState<StaffUser | null>(() => {
@@ -154,7 +233,17 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Pre-seed an active order for demonstration
   const [orders, setOrders] = useState<Record<string, Order>>(() => {
     const saved = localStorage.getItem(`${STORAGE_PREFIX}orders`);
-    if (saved) return JSON.parse(saved);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      // Merge seed completed orders (don't overwrite if already saved)
+      const seedOrders: Record<string, Order> = {};
+      for (const order of initialCompletedOrders) {
+        if (!parsed[order.id]) {
+          seedOrders[order.id] = order;
+        }
+      }
+      return { ...seedOrders, ...parsed };
+    }
 
     // Initial demo order for Table A2
     const demoOrderId = 'ord-1001';
@@ -257,7 +346,14 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const subtotal = 240 + 230 + 90; // 560
     const vat = Math.round(subtotal * 0.07 * 100) / 100;
 
+    // Build seed completed orders map
+    const seedOrders: Record<string, Order> = {};
+    for (const order of initialCompletedOrders) {
+      seedOrders[order.id] = order;
+    }
+
     return {
+      ...seedOrders,
       [demoOrderId]: {
         id: demoOrderId,
         orderNumber: '#1001',
@@ -302,6 +398,11 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     ];
   });
 
+  const [shiftHistory, setShiftHistory] = useState<Shift[]>(() => {
+    const saved = localStorage.getItem(`${STORAGE_PREFIX}shift_history`);
+    return saved ? JSON.parse(saved) : [];
+  });
+
   // UI Navigation states
   const [activeTab, setActiveTab] = useState<'pos' | 'tables' | 'orders' | 'admin' | 'kds'>('pos');
   const [adminSubTab, setAdminSubTab] = useState<AdminSubTab>('dashboard');
@@ -333,6 +434,10 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     localStorage.setItem(`${STORAGE_PREFIX}cash_tx`, JSON.stringify(cashTransactions));
   }, [cashTransactions]);
+
+  useEffect(() => {
+    localStorage.setItem(`${STORAGE_PREFIX}shift_history`, JSON.stringify(shiftHistory));
+  }, [shiftHistory]);
 
   // Auth
   const loginWithPin = (pin: string): boolean => {
@@ -904,15 +1009,17 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const closeShift = (actualCash: number, notes?: string) => {
     const discrepancy = actualCash - currentShift.expectedCash;
-    setCurrentShift((prev) => ({
-      ...prev,
+    const closedShift: Shift = {
+      ...currentShift,
       closedAt: new Date().toISOString(),
       closedBy: currentStaff?.name || 'Staff',
       actualCash,
       discrepancy,
       status: 'closed',
       notes,
-    }));
+    };
+    setCurrentShift(closedShift);
+    setShiftHistory((prev) => [closedShift, ...prev]);
   };
 
   const reopenShift = (openingFloat: number) => {
@@ -953,6 +1060,332 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       id: `item-${Date.now()}`,
     };
     setMenuItems((prev) => [...prev, newItem]);
+  };
+
+  // Procurement & LINE Agent state
+  const [suppliers, setSuppliers] = useState<Supplier[]>(() => {
+    const saved = localStorage.getItem(`${STORAGE_PREFIX}suppliers`);
+    return saved ? JSON.parse(saved) : initialSuppliers;
+  });
+
+  const [inventory, setInventory] = useState<InventoryItem[]>(() => {
+    const saved = localStorage.getItem(`${STORAGE_PREFIX}inventory`);
+    return saved ? JSON.parse(saved) : initialInventory;
+  });
+
+  const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>(() => {
+    const saved = localStorage.getItem(`${STORAGE_PREFIX}purchase_orders`);
+    return saved ? JSON.parse(saved) : initialPurchaseOrders;
+  });
+
+  const [lineAgentConfig, setLineAgentConfig] = useState<LineAgentConfig>(() => {
+    const saved = localStorage.getItem(`${STORAGE_PREFIX}line_agent_config`);
+    return saved ? JSON.parse(saved) : initialLineAgentConfig;
+  });
+
+  const [lineLogs, setLineLogs] = useState<LineMessageLog[]>(() => {
+    const saved = localStorage.getItem(`${STORAGE_PREFIX}line_logs`);
+    return saved ? JSON.parse(saved) : initialLineLogs;
+  });
+
+  useEffect(() => {
+    localStorage.setItem(`${STORAGE_PREFIX}suppliers`, JSON.stringify(suppliers));
+  }, [suppliers]);
+
+  useEffect(() => {
+    localStorage.setItem(`${STORAGE_PREFIX}inventory`, JSON.stringify(inventory));
+  }, [inventory]);
+
+  useEffect(() => {
+    localStorage.setItem(`${STORAGE_PREFIX}purchase_orders`, JSON.stringify(purchaseOrders));
+  }, [purchaseOrders]);
+
+  useEffect(() => {
+    localStorage.setItem(`${STORAGE_PREFIX}line_agent_config`, JSON.stringify(lineAgentConfig));
+  }, [lineAgentConfig]);
+
+  useEffect(() => {
+    localStorage.setItem(`${STORAGE_PREFIX}line_logs`, JSON.stringify(lineLogs));
+  }, [lineLogs]);
+
+  const addSupplier = (s: Omit<Supplier, 'id'>) => {
+    const newSupplier: Supplier = { ...s, id: `sup-${Date.now()}` };
+    setSuppliers((prev) => [...prev, newSupplier]);
+  };
+
+  const updateSupplier = (s: Supplier) => {
+    setSuppliers((prev) => prev.map((item) => (item.id === s.id ? s : item)));
+  };
+
+  const deleteSupplier = (supplierId: string) => {
+    setSuppliers((prev) => prev.filter((s) => s.id !== supplierId));
+  };
+
+  const addInventoryItem = (item: Omit<InventoryItem, 'id'>) => {
+    const newItem: InventoryItem = { ...item, id: `inv-${Date.now()}` };
+    setInventory((prev) => [...prev, newItem]);
+  };
+
+  const updateInventoryItem = (item: InventoryItem) => {
+    setInventory((prev) => prev.map((i) => (i.id === item.id ? item : i)));
+  };
+
+  const deleteInventoryItem = (itemId: string) => {
+    setInventory((prev) => prev.filter((i) => i.id !== itemId));
+  };
+
+  const createPurchaseOrder = (poData: Omit<PurchaseOrder, 'id' | 'poNumber' | 'createdAt' | 'createdBy' | 'status' | 'paymentStatus' | 'stockIngested'>): PurchaseOrder => {
+    const poCount = purchaseOrders.length + 1;
+    const poNum = `PO-202609-${String(poCount).padStart(3, '0')}`;
+    const newPo: PurchaseOrder = {
+      ...poData,
+      id: `po-${Date.now()}`,
+      poNumber: poNum,
+      status: 'draft',
+      paymentStatus: 'pending',
+      stockIngested: false,
+      createdAt: new Date().toISOString(),
+      createdBy: currentStaff?.name || 'Store Staff',
+    };
+    setPurchaseOrders((prev) => [newPo, ...prev]);
+    return newPo;
+  };
+
+  const sendPOToLineGroup = (poId: string) => {
+    const po = purchaseOrders.find((p) => p.id === poId);
+    if (!po) return;
+
+    const supplier = suppliers.find((s) => s.id === po.supplierId);
+    const supplierName = supplier?.name || po.supplierName;
+
+    setPurchaseOrders((prev) =>
+      prev.map((p) =>
+        p.id === poId
+          ? {
+              ...p,
+              status: 'sent_line',
+              sentToLineAt: new Date().toISOString(),
+            }
+          : p
+      )
+    );
+
+    const itemSummaryText = po.items
+      .map((it, idx) => `${idx + 1}. ${it.nameTh} ${it.qtyOrdered} ${it.unit} @ ฿${it.unitPrice} = ฿${it.total.toLocaleString()}`)
+      .join('\n');
+    const msgText = `ขอสั่งซื้อสินค้าตามใบสั่งซื้อ ${po.poNumber}:\n${itemSummaryText}\nรวมทั้งสิ้น: ฿${po.grandTotal.toLocaleString()}\nส่งพรุ่งนี้เช้า ร้านตุ๋นมัน (พระราม 3) ขอบคุณครับ`;
+
+    const newLog: LineMessageLog = {
+      id: `log-${Date.now()}`,
+      poId: po.id,
+      supplierName,
+      direction: 'outbound',
+      sender: '🤖 Alberta Procurement Agent',
+      messageText: msgText,
+      timestamp: new Date().toISOString(),
+    };
+
+    setLineLogs((prev) => [newLog, ...prev]);
+  };
+
+  const simulateSupplierLineReply = (poId: string, simulatedTotal?: number, isDiscrepancy?: boolean) => {
+    const po = purchaseOrders.find((p) => p.id === poId);
+    if (!po) return;
+
+    const supplier = suppliers.find((s) => s.id === po.supplierId);
+    const supplierPromptPay = supplier?.promptPayId || '0812223333';
+    const finalTotal = isDiscrepancy ? (simulatedTotal || po.grandTotal + 300) : po.grandTotal;
+    const discrepancy = isDiscrepancy ? finalTotal - po.grandTotal : 0;
+
+    const qrPayload = `00020101021229370016A0000006770101110113${supplierPromptPay}5802TH5303764540${finalTotal.toFixed(2)}6304E8A2`;
+
+    setPurchaseOrders((prev) =>
+      prev.map((p) =>
+        p.id === poId
+          ? {
+              ...p,
+              status: discrepancy !== 0 ? 'ocr_received' : 'reconciled',
+              scannedBillUrl: 'https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?auto=format&fit=crop&w=600&q=80',
+              ocrExtractedTotal: finalTotal,
+              discrepancyAmount: discrepancy,
+              promptPayQrPayload: qrPayload,
+            }
+          : p
+      )
+    );
+
+    const newLog: LineMessageLog = {
+      id: `log-${Date.now()}`,
+      poId: po.id,
+      supplierName: po.supplierName,
+      direction: 'inbound',
+      sender: supplier?.contactPerson || 'ซัพพลายเออร์',
+      messageText: isDiscrepancy
+        ? `รับออเดอร์ครับเฮีย บิล PO นี้มีปรับราคาพิเศษ รวมทั้งสิ้น ฿${finalTotal.toLocaleString()} สแกน QR PromptPay นี้ชำระได้เลยครับ`
+        : `รับออเดอร์เรียบร้อยครับ ส่งตามเวลาแน่นอน ฿${finalTotal.toLocaleString()} แนบใบเสร็จและ PromptPay QR ให้ครับ`,
+      imageUrl: 'https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?auto=format&fit=crop&w=600&q=80',
+      qrPayload,
+      timestamp: new Date().toISOString(),
+      ocrStatus: isDiscrepancy ? 'discrepancy' : 'verified',
+    };
+
+    setLineLogs((prev) => [newLog, ...prev]);
+  };
+
+  const approveAndPayPO = (poId: string) => {
+    const po = purchaseOrders.find((p) => p.id === poId);
+    if (!po) return;
+
+    setPurchaseOrders((prev) =>
+      prev.map((p) =>
+        p.id === poId
+          ? {
+              ...p,
+              status: 'completed',
+              paymentStatus: 'paid',
+              paidAt: new Date().toISOString(),
+              stockIngested: true,
+            }
+          : p
+      )
+    );
+
+    setInventory((prevInv) =>
+      prevInv.map((invItem) => {
+        const poMatch = po.items.find((it) => it.inventoryItemId === invItem.id);
+        if (poMatch) {
+          return {
+            ...invItem,
+            currentStock: invItem.currentStock + poMatch.qtyOrdered,
+          };
+        }
+        return invItem;
+      })
+    );
+  };
+
+  const updateLineAgentConfig = (cfg: Partial<LineAgentConfig>) => {
+    setLineAgentConfig((prev) => ({ ...prev, ...cfg }));
+  };
+
+  const triggerAutoPOForLowStock = (itemId: string) => {
+    const invItem = inventory.find((i) => i.id === itemId);
+    if (!invItem) return;
+
+    const supplier = suppliers.find((s) => s.id === invItem.supplierId) || suppliers[0];
+    const qtyToOrder = Math.max(10, Math.ceil(invItem.minSafetyThreshold * 1.5 - invItem.currentStock));
+
+    const poItem: POItem = {
+      inventoryItemId: invItem.id,
+      nameTh: invItem.nameTh,
+      unit: invItem.unit,
+      qtyOrdered: qtyToOrder,
+      unitPrice: invItem.avgCost,
+      total: qtyToOrder * invItem.avgCost,
+    };
+
+    const poCount = purchaseOrders.length + 1;
+    const poNum = `PO-202609-${String(poCount).padStart(3, '0')}`;
+    const newPo: PurchaseOrder = {
+      id: `po-${Date.now()}`,
+      poNumber: poNum,
+      supplierId: supplier.id,
+      supplierName: supplier.name,
+      status: 'draft',
+      items: [poItem],
+      subtotal: poItem.total,
+      grandTotal: poItem.total,
+      createdAt: new Date().toISOString(),
+      createdBy: currentStaff?.name || 'Store Staff',
+      paymentStatus: 'pending',
+      stockIngested: false,
+    };
+
+    setPurchaseOrders((prev) => [newPo, ...prev]);
+
+    if (lineAgentConfig.autoSendLineOnLowStock) {
+      setTimeout(() => {
+        sendPOToLineGroup(newPo.id);
+      }, 300);
+    }
+  };
+
+  // API Keys & Accounting Program Connectors state
+  const [apiKeys, setApiKeys] = useState<ApiKey[]>(() => {
+    const saved = localStorage.getItem(`${STORAGE_PREFIX}api_keys`);
+    return saved ? JSON.parse(saved) : initialApiKeys;
+  });
+
+  const [webhooks, setWebhooks] = useState<WebhookEndpoint[]>(() => {
+    const saved = localStorage.getItem(`${STORAGE_PREFIX}webhooks`);
+    return saved ? JSON.parse(saved) : initialWebhooks;
+  });
+
+  const [accountingConfig, setAccountingConfig] = useState<AccountingIntegrationConfig>(() => {
+    const saved = localStorage.getItem(`${STORAGE_PREFIX}accounting_config`);
+    return saved ? JSON.parse(saved) : initialAccountingConfig;
+  });
+
+  useEffect(() => {
+    localStorage.setItem(`${STORAGE_PREFIX}api_keys`, JSON.stringify(apiKeys));
+  }, [apiKeys]);
+
+  useEffect(() => {
+    localStorage.setItem(`${STORAGE_PREFIX}webhooks`, JSON.stringify(webhooks));
+  }, [webhooks]);
+
+  useEffect(() => {
+    localStorage.setItem(`${STORAGE_PREFIX}accounting_config`, JSON.stringify(accountingConfig));
+  }, [accountingConfig]);
+
+  const generateApiKey = (name: string, permissions: ApiKey['permissions'], environment: 'live' | 'test' = 'live'): ApiKey => {
+    const randomHex = Math.random().toString(16).substring(2, 10) + Math.random().toString(16).substring(2, 10);
+    const secret = `ak_${environment}_alberta_${randomHex}`;
+    const newKey: ApiKey = {
+      id: `key-${Date.now()}`,
+      name,
+      keySecret: secret,
+      environment,
+      permissions,
+      createdAt: new Date().toISOString(),
+      active: true,
+    };
+    setApiKeys((prev) => [newKey, ...prev]);
+    return newKey;
+  };
+
+  const revokeApiKey = (keyId: string) => {
+    setApiKeys((prev) => prev.filter((k) => k.id !== keyId));
+  };
+
+  const addWebhookEndpoint = (wh: Omit<WebhookEndpoint, 'id'>) => {
+    const newWh: WebhookEndpoint = {
+      ...wh,
+      id: `wh-${Date.now()}`,
+    };
+    setWebhooks((prev) => [...prev, newWh]);
+  };
+
+  const deleteWebhookEndpoint = (whId: string) => {
+    setWebhooks((prev) => prev.filter((w) => w.id !== whId));
+  };
+
+  const updateAccountingConfig = (newCfg: Partial<AccountingIntegrationConfig>) => {
+    setAccountingConfig((prev) => ({ ...prev, ...newCfg, lastSyncedAt: new Date().toISOString() }));
+  };
+
+  const triggerTestWebhook = (whId: string) => {
+    setWebhooks((prev) =>
+      prev.map((w) =>
+        w.id === whId
+          ? {
+              ...w,
+              lastTriggeredAt: new Date().toISOString(),
+              lastStatus: 'success',
+            }
+          : w
+      )
+    );
   };
 
   return (
@@ -1001,6 +1434,7 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         markOrderItemReady,
         markOrderAllReady,
         currentShift,
+        shiftHistory,
         cashTransactions,
         addCashTransaction,
         closeShift,
@@ -1015,6 +1449,32 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setActiveTab,
         adminSubTab,
         setAdminSubTab,
+        suppliers,
+        inventory,
+        purchaseOrders,
+        lineAgentConfig,
+        lineLogs,
+        addSupplier,
+        updateSupplier,
+        deleteSupplier,
+        addInventoryItem,
+        updateInventoryItem,
+        deleteInventoryItem,
+        createPurchaseOrder,
+        sendPOToLineGroup,
+        simulateSupplierLineReply,
+        approveAndPayPO,
+        updateLineAgentConfig,
+        triggerAutoPOForLowStock,
+        apiKeys,
+        webhooks,
+        accountingConfig,
+        generateApiKey,
+        revokeApiKey,
+        addWebhookEndpoint,
+        deleteWebhookEndpoint,
+        updateAccountingConfig,
+        triggerTestWebhook,
       }}
     >
       {children}

@@ -134,7 +134,6 @@ export const OrderPanel: React.FC<OrderPanelProps> = ({ hideMenuToggle = false }
   }
 
   const items = activeOrder?.items || [];
-  const pendingCount = items.filter((i) => i.status === 'pending').length;
   const numCash = parseFloat(cashTendered) || 0;
   const isCashInsufficient = activeOrder ? numCash < activeOrder.grandTotal : false;
 
@@ -154,19 +153,21 @@ export const OrderPanel: React.FC<OrderPanelProps> = ({ hideMenuToggle = false }
       {/* Table Header */}
       <div
         style={{
-          padding: '14px 18px',
+          padding: '10px 14px',
           background: 'var(--color-bg-elevated)',
           borderBottom: '1px solid var(--color-border)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
+          gap: 8,
+          flexShrink: 0,
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
           <div
             style={{
-              width: 64,
-              height: 40,
+              padding: '4px 10px',
+              height: 36,
               borderRadius: 'var(--radius-md)',
               background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.2), rgba(217, 119, 6, 0.1))',
               border: '1px solid rgba(245, 158, 11, 0.4)',
@@ -174,101 +175,100 @@ export const OrderPanel: React.FC<OrderPanelProps> = ({ hideMenuToggle = false }
               alignItems: 'center',
               justifyContent: 'center',
               color: 'var(--color-primary)',
-              fontSize: 18,
+              fontSize: 16,
               fontWeight: 800,
+              whiteSpace: 'nowrap',
+              flexShrink: 0,
             }}
           >
             {language === 'th' ? 'โต๊ะ ' : 'Table '}
             {activeTable.number}
           </div>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span
-                style={{
-                  fontSize: 16,
-                  padding: '2px 6px',
-                  borderRadius: 4,
-                  color: 'var(--color-primary)',
-                  fontWeight: 800,
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                {language === 'th' ? 'รายการที่สั่ง' : 'Bill'}
-              </span>
-              {activeOrder && items.length > 0 && (
-                <button
-                  onClick={handleDirectPrintReceipt}
-                  className="btn-secondary"
-                  style={{
-                    flex: pendingCount > 0 ? 'none' : 1,
-                    padding: '10px 14px',
-                    display: 'flex',
-                    alignItems: 'right',
-                    justifyContent: 'right',
-                    gap: 6,
-                  }}
-                  title={language === 'th' ? 'พิมพ์ใบเรียกเก็บเงินทันที (ไม่มี Modal)' : 'Print bill directly'}
-                >
-                  <Printer size={16} />
-                  <span>{language === 'th' ? 'พิมพ์บิล' : 'Print Pre-Bill'}</span>
-                </button>
-              )}
-
-            </div>
-          </div>
+          <span
+            style={{
+              fontSize: 15,
+              fontWeight: 800,
+              color: '#fff',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {language === 'th' ? 'รายการที่สั่ง' : 'Bill'}
+          </span>
         </div>
 
-        {/* Toggle between Menu Catalog & Cart (only when menu is not displayed side-by-side) */}
-        {!hideMenuToggle && (
-          <div style={{ display: 'flex', background: 'rgba(15, 23, 42, 0.6)', padding: 3, borderRadius: 8, border: '1px solid var(--color-border)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {activeOrder && items.length > 0 && (
             <button
-              onClick={() => setCatalogView('menu')}
+              onClick={handleDirectPrintReceipt}
+              className="btn-secondary"
               style={{
-                padding: '6px 12px',
-                borderRadius: 6,
-                border: 'none',
-                background: catalogView === 'menu' ? 'var(--color-primary)' : 'transparent',
-                color: catalogView === 'menu' ? '#000' : 'var(--color-text-secondary)',
+                padding: '6px 10px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 5,
                 fontSize: 12,
                 fontWeight: 700,
-                cursor: 'pointer',
+                flexShrink: 0,
               }}
+              title={language === 'th' ? 'พิมพ์ใบเรียกเก็บเงินทันที (ไม่มี Modal)' : 'Print bill directly'}
             >
-              {language === 'th' ? '+ สั่งอาหาร' : '+ Add Food'}
+              <Printer size={15} />
+              <span>{language === 'th' ? 'พิมพ์บิล' : 'Print'}</span>
             </button>
-            <button
-              onClick={() => setCatalogView('cart')}
-              style={{
-                padding: '6px 12px',
-                borderRadius: 6,
-                border: 'none',
-                background: catalogView === 'cart' ? 'var(--color-primary)' : 'transparent',
-                color: catalogView === 'cart' ? '#000' : 'var(--color-text-secondary)',
-                fontSize: 12,
-                fontWeight: 700,
-                cursor: 'pointer',
-                position: 'relative',
-              }}
-            >
-              <span>{language === 'th' ? 'รายการบิล' : 'Bill Items'}</span>
-              {items.length > 0 && (
-                <span
-                  style={{
-                    marginLeft: 4,
-                    padding: '1px 5px',
-                    borderRadius: 10,
-                    fontSize: 10,
-                    background: catalogView === 'cart' ? '#000' : 'var(--color-primary)',
-                    color: catalogView === 'cart' ? '#fff' : '#000',
-                    fontWeight: 800,
-                  }}
-                >
-                  {items.length}
-                </span>
-              )}
-            </button>
-          </div>
-        )}
+          )}
+
+          {/* Toggle between Menu Catalog & Cart (only when menu is not displayed side-by-side) */}
+          {!hideMenuToggle && (
+            <div style={{ display: 'flex', background: 'rgba(15, 23, 42, 0.6)', padding: 3, borderRadius: 8, border: '1px solid var(--color-border)' }}>
+              <button
+                onClick={() => setCatalogView('menu')}
+                style={{
+                  padding: '6px 12px',
+                  borderRadius: 6,
+                  border: 'none',
+                  background: catalogView === 'menu' ? 'var(--color-primary)' : 'transparent',
+                  color: catalogView === 'menu' ? '#000' : 'var(--color-text-secondary)',
+                  fontSize: 12,
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                }}
+              >
+                {language === 'th' ? '+ สั่งอาหาร' : '+ Add Food'}
+              </button>
+              <button
+                onClick={() => setCatalogView('cart')}
+                style={{
+                  padding: '6px 12px',
+                  borderRadius: 6,
+                  border: 'none',
+                  background: catalogView === 'cart' ? 'var(--color-primary)' : 'transparent',
+                  color: catalogView === 'cart' ? '#000' : 'var(--color-text-secondary)',
+                  fontSize: 12,
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  position: 'relative',
+                }}
+              >
+                <span>{language === 'th' ? 'รายการบิล' : 'Bill Items'}</span>
+                {items.length > 0 && (
+                  <span
+                    style={{
+                      marginLeft: 4,
+                      padding: '1px 5px',
+                      borderRadius: 10,
+                      fontSize: 10,
+                      background: catalogView === 'cart' ? '#000' : 'var(--color-primary)',
+                      color: catalogView === 'cart' ? '#fff' : '#000',
+                      fontWeight: 800,
+                    }}
+                  >
+                    {items.length}
+                  </span>
+                )}
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Main Order View Area */}
@@ -344,12 +344,12 @@ export const OrderPanel: React.FC<OrderPanelProps> = ({ hideMenuToggle = false }
 
                     {/* Quantity Controls & Enlarged Rectangle Delete Button */}
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: 6, borderTop: '1px solid rgba(255, 255, 255, 0.06)' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                         <button
                           onClick={() => updateOrderItemQuantity(item.id, -1)}
                           style={{
-                            width: 30,
-                            height: 30,
+                            width: 34,
+                            height: 34,
                             borderRadius: 6,
                             background: 'var(--color-bg-card)',
                             border: '1px solid var(--color-border)',
@@ -362,14 +362,14 @@ export const OrderPanel: React.FC<OrderPanelProps> = ({ hideMenuToggle = false }
                         >
                           <Minus size={14} />
                         </button>
-                        <span style={{ minWidth: 28, textAlign: 'center', fontSize: 15, fontWeight: 700, fontFamily: 'var(--font-mono)' }}>
+                        <span style={{ minWidth: 26, textAlign: 'center', fontSize: 15, fontWeight: 700, fontFamily: 'var(--font-mono)' }}>
                           {item.quantity}
                         </span>
                         <button
                           onClick={() => updateOrderItemQuantity(item.id, 1)}
                           style={{
-                            width: 30,
-                            height: 30,
+                            width: 34,
+                            height: 34,
                             borderRadius: 6,
                             background: 'var(--color-bg-card)',
                             border: '1px solid var(--color-border)',
@@ -395,10 +395,10 @@ export const OrderPanel: React.FC<OrderPanelProps> = ({ hideMenuToggle = false }
                           cursor: 'pointer',
                           display: 'flex',
                           alignItems: 'center',
-                          gap: 6,
+                          gap: 5,
                           fontSize: 12,
                           fontWeight: 700,
-                          padding: '6px 14px',
+                          padding: '6px 12px',
                           transition: 'all 0.15s ease',
                         }}
                         onMouseEnter={(e) => {
@@ -411,8 +411,8 @@ export const OrderPanel: React.FC<OrderPanelProps> = ({ hideMenuToggle = false }
                         }}
                         title={language === 'th' ? 'ลบรายการนี้' : 'Delete item'}
                       >
-                        <Trash2 size={14} />
-                        <span>{language === 'th' ? 'ลบรายการ' : 'Delete'}</span>
+                        <Trash2 size={13} />
+                        <span>{language === 'th' ? 'ลบ' : 'Delete'}</span>
                       </button>
                     </div>
                   </div>
@@ -427,20 +427,21 @@ export const OrderPanel: React.FC<OrderPanelProps> = ({ hideMenuToggle = false }
               style={{
                 background: 'var(--color-bg-elevated)',
                 borderTop: '1px solid var(--color-border)',
-                padding: '12px 18px',
+                padding: '10px 14px',
                 display: 'flex',
                 flexDirection: 'column',
-                gap: 6,
+                gap: 5,
+                flexShrink: 0,
               }}
             >
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--color-text-secondary)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--color-text-secondary)' }}>
                 <span>{language === 'th' ? 'ยอดรวมอาหาร (Subtotal)' : 'Subtotal'}</span>
                 <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>฿{activeOrder.subtotal.toLocaleString()}</span>
               </div>
 
               {/* Service Charge Line - Only shown if enabled in Settings */}
               {settings.enableServiceCharge && activeOrder.serviceChargeAmount > 0 && (
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 13, color: 'var(--color-text-secondary)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12, color: 'var(--color-text-secondary)' }}>
                   <span>
                     {language === 'th'
                       ? `ค่าบริการ Service Charge (${Math.round(settings.serviceChargeRate * 100)}%)`
@@ -454,7 +455,7 @@ export const OrderPanel: React.FC<OrderPanelProps> = ({ hideMenuToggle = false }
 
               {/* VAT Row - Only shown if enabled in Settings */}
               {settings.enableVat && (
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--color-text-muted)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--color-text-muted)' }}>
                   <span>
                     {language === 'th'
                       ? settings.isVatInclusive
@@ -474,17 +475,17 @@ export const OrderPanel: React.FC<OrderPanelProps> = ({ hideMenuToggle = false }
                   display: 'flex',
                   justifyContent: 'space-between',
                   alignItems: 'baseline',
-                  paddingTop: 8,
+                  paddingTop: 6,
                   marginTop: 2,
                   borderTop: '1px dashed var(--color-border)',
                 }}
               >
-                <span style={{ fontSize: 15, fontWeight: 700, color: '#fff' }}>
+                <span style={{ fontSize: 14, fontWeight: 700, color: '#fff' }}>
                   {language === 'th' ? 'ยอดสุทธิ (Total)' : 'Total Due'}
                 </span>
                 <span
                   style={{
-                    fontSize: 22,
+                    fontSize: 20,
                     fontWeight: 800,
                     color: 'var(--color-primary)',
                     fontFamily: 'var(--font-mono)',
@@ -499,29 +500,24 @@ export const OrderPanel: React.FC<OrderPanelProps> = ({ hideMenuToggle = false }
           {/* Bottom Actions Bar */}
           <div
             style={{
-              padding: '12px 16px',
+              padding: '10px 14px',
               background: 'var(--color-bg-card)',
               borderTop: '1px solid var(--color-border)',
               display: 'flex',
               flexDirection: 'column',
               gap: 8,
+              flexShrink: 0,
             }}
           >
-            {/* Action Row 1: Direct Instant Print */}
-            <div style={{ display: 'flex', gap: 8 }}>
-
-
-            </div>
-
             {/* Action Row 2: Pay via โอนเงิน (Transfer) & เงินสด (Cash) */}
             {activeOrder && items.length > 0 && (
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
                 {/* 1. โอนเงิน (Mark as paid via transferred immediately) */}
                 <button
                   onClick={handleTransferPayment}
                   disabled={isPaying}
                   style={{
-                    height: 52,
+                    height: 48,
                     borderRadius: 'var(--radius-md)',
                     background: 'linear-gradient(135deg, #2563eb, #1d4ed8)',
                     border: '1px solid rgba(59, 130, 246, 0.4)',
@@ -533,13 +529,13 @@ export const OrderPanel: React.FC<OrderPanelProps> = ({ hideMenuToggle = false }
                     cursor: isPaying ? 'not-allowed' : 'pointer',
                     boxShadow: '0 4px 14px rgba(37, 99, 235, 0.35)',
                     transition: 'all 0.15s ease',
-                    padding: '4px 8px',
+                    padding: '3px 6px',
                     opacity: isPaying ? 0.7 : 1,
                   }}
                   title={language === 'th' ? 'ชำระเงินโดยการโอนเงิน (บันทึกทันที)' : 'Pay via Transfer'}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 800, fontSize: 15 }}>
-                    <QrCode size={18} />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontWeight: 800, fontSize: 14 }}>
+                    <QrCode size={16} />
                     <span>{language === 'th' ? 'โอนเงิน' : 'Transfer'}</span>
                   </div>
                   <span style={{ fontSize: 11, opacity: 0.9, fontFamily: 'var(--font-mono)' }}>
@@ -552,7 +548,7 @@ export const OrderPanel: React.FC<OrderPanelProps> = ({ hideMenuToggle = false }
                   onClick={openCashModal}
                   disabled={isPaying}
                   style={{
-                    height: 52,
+                    height: 48,
                     borderRadius: 'var(--radius-md)',
                     background: 'linear-gradient(135deg, #10b981, #059669)',
                     border: '1px solid rgba(16, 185, 129, 0.4)',
@@ -564,13 +560,13 @@ export const OrderPanel: React.FC<OrderPanelProps> = ({ hideMenuToggle = false }
                     cursor: isPaying ? 'not-allowed' : 'pointer',
                     boxShadow: '0 4px 14px rgba(16, 185, 129, 0.35)',
                     transition: 'all 0.15s ease',
-                    padding: '4px 8px',
+                    padding: '3px 6px',
                     opacity: isPaying ? 0.7 : 1,
                   }}
                   title={language === 'th' ? 'ชำระเงินสด (คำนวณเงินทอน)' : 'Pay via Cash'}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 800, fontSize: 15 }}>
-                    <Banknote size={18} />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontWeight: 800, fontSize: 14 }}>
+                    <Banknote size={16} />
                     <span>{language === 'th' ? 'เงินสด' : 'Cash'}</span>
                   </div>
                   <span style={{ fontSize: 11, opacity: 0.9, fontFamily: 'var(--font-mono)' }}>

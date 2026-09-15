@@ -121,46 +121,57 @@ export const POSOrderView: React.FC = () => {
       </div>
 
       {/* Main 3-Panels Layout: 1. Tables Blocks | 2. Tables Bill | 3. Menu 1-Click */}
-      <div style={{ flex: 1, display: 'flex', overflow: 'hidden', width: '100%', height: '100%' }}>
-        {/* Panel 1: Tables blocks ผังโต๊ะ (27% width, min 280px, max 360px) */}
+      <div
+        className="pos-3panel-container"
+        style={{
+          flex: 1,
+          display: 'flex',
+          overflow: 'hidden',
+          width: '100%',
+          height: '100%',
+        }}
+      >
+        {/* Panel 1: Tables blocks ผังโต๊ะ (~26% width, 260px-300px) */}
         <div
           style={{
-            width: '27%',
-            minWidth: 280,
-            maxWidth: 360,
+            width: '26%',
+            minWidth: 260,
+            maxWidth: 300,
             height: '100%',
             borderRight: '1px solid var(--color-border)',
             display: 'flex',
             flexDirection: 'column',
             overflow: 'hidden',
             background: '#070a11',
+            flexShrink: 0,
           }}
         >
           <TableMap compact={true} onSelectTable={(tableId) => setActiveTableId(tableId)} />
         </div>
 
-        {/* Panel 2: Tables bill รายการอาหารที่สั่ง (33% width, min 320px, max 420px) */}
+        {/* Panel 2: Tables bill รายการอาหารที่สั่ง (~33% width, 320px-380px) */}
         <div
           style={{
             width: '33%',
             minWidth: 320,
-            maxWidth: 420,
+            maxWidth: 380,
             height: '100%',
             borderRight: '1px solid var(--color-border)',
             display: 'flex',
             flexDirection: 'column',
             overflow: 'hidden',
             background: 'var(--color-bg-card)',
+            flexShrink: 0,
           }}
         >
           <OrderPanel hideMenuToggle={true} />
         </div>
 
-        {/* Panel 3: Menu One-click add to table (Remaining width, min 380px) */}
+        {/* Panel 3: Menu One-click add to table (Remaining width, min 350px) */}
         <div
           style={{
             flex: 1,
-            minWidth: 380,
+            minWidth: 350,
             height: '100%',
             display: 'flex',
             flexDirection: 'column',

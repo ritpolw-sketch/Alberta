@@ -341,7 +341,7 @@ export const TableLayoutManager: React.FC = () => {
       {/* Top Header & Toolbar for Table Management */}
       <div
         style={{
-          padding: '14px 24px',
+          padding: '10px 16px',
           background: 'var(--color-bg-card)',
           borderBottom: '1px solid var(--color-border)',
           display: 'flex',
@@ -349,75 +349,80 @@ export const TableLayoutManager: React.FC = () => {
           justifyContent: 'space-between',
           zIndex: 10,
           boxShadow: '0 4px 12px rgba(0, 0, 0, 0.35)',
+          gap: 10,
+          flexWrap: 'wrap',
         }}
       >
         {/* Title & Dimension Info */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
           <div
             style={{
-              width: 40,
-              height: 40,
-              borderRadius: 10,
+              width: 36,
+              height: 36,
+              minWidth: 36,
+              borderRadius: 8,
               background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.25), rgba(217, 119, 6, 0.12))',
               border: '1px solid rgba(245, 158, 11, 0.35)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               color: 'var(--color-primary)',
+              flexShrink: 0,
             }}
           >
-            <LayoutGrid size={22} />
+            <LayoutGrid size={20} />
           </div>
 
-          <div>
+          <div style={{ minWidth: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <h2 style={{ fontSize: 18, fontWeight: 800, color: '#fff', margin: 0 }}>
-                {language === 'th' ? 'จัดการผังโต๊ะร้านค้า' : 'Table Layout Management'}
+              <h2 style={{ fontSize: 16, fontWeight: 800, color: '#fff', margin: 0, whiteSpace: 'nowrap' }}>
+                {language === 'th' ? 'จัดการผังโต๊ะร้านค้า' : 'Table Layout'}
               </h2>
               <span
                 style={{
-                  fontSize: 11,
+                  fontSize: 10,
                   fontWeight: 700,
-                  padding: '2px 8px',
-                  borderRadius: 12,
+                  padding: '2px 7px',
+                  borderRadius: 10,
                   background: 'rgba(245, 158, 11, 0.15)',
                   color: 'var(--color-primary)',
                   border: '1px solid rgba(245, 158, 11, 0.25)',
+                  whiteSpace: 'nowrap',
                 }}
               >
-                {language === 'th' ? 'โหมดปรับแต่งผัง' : 'Layout Editor'}
+                {language === 'th' ? 'โหมดปรับแต่งผัง' : 'Editor'}
               </span>
             </div>
-            <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', display: 'flex', alignItems: 'center', gap: 8, marginTop: 2 }}>
+            <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', display: 'flex', alignItems: 'center', gap: 6, marginTop: 1, whiteSpace: 'nowrap' }}>
               <span>{draftTables.length} {language === 'th' ? 'โต๊ะ' : 'tables'}</span>
               <span>•</span>
               <span style={{ color: 'var(--color-primary)', fontWeight: 600 }}>
-                {gridCols} × {gridRows} ({gridCols * gridRows} บล็อก)
+                {gridCols} × {gridRows}
               </span>
               <span>•</span>
-              <span style={{ color: '#94a3b8', display: 'flex', alignItems: 'center', gap: 3 }}>
-                <Maximize2 size={11} />
-                <span>Always Align Center</span>
+              <span style={{ color: '#94a3b8', display: 'flex', alignItems: 'center', gap: 2 }}>
+                <Maximize2 size={10} />
+                <span>Align Center</span>
               </span>
             </div>
           </div>
         </div>
 
         {/* Action Controls & Steppers */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
           {/* Columns Stepper */}
           <div
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: 6,
+              gap: 4,
               background: 'var(--color-bg-elevated)',
               border: '1px solid var(--color-border)',
-              padding: '4px 10px',
+              padding: '3px 8px',
               borderRadius: 8,
             }}
           >
-            <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-secondary)' }}>
+            <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-secondary)' }}>
               {language === 'th' ? 'คอลัมน์:' : 'Cols:'}
             </span>
             <button
@@ -427,8 +432,8 @@ export const TableLayoutManager: React.FC = () => {
                 border: 'none',
                 color: '#fff',
                 borderRadius: 4,
-                width: 24,
-                height: 24,
+                width: 22,
+                height: 22,
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
@@ -436,9 +441,9 @@ export const TableLayoutManager: React.FC = () => {
               }}
               title="Decrease Columns"
             >
-              <Minus size={13} />
+              <Minus size={12} />
             </button>
-            <span style={{ fontSize: 14, fontWeight: 800, color: '#fff', minWidth: 20, textAlign: 'center', fontFamily: 'var(--font-mono)' }}>
+            <span style={{ fontSize: 13, fontWeight: 800, color: '#fff', minWidth: 18, textAlign: 'center', fontFamily: 'var(--font-mono)' }}>
               {gridCols}
             </span>
             <button
@@ -448,8 +453,8 @@ export const TableLayoutManager: React.FC = () => {
                 border: 'none',
                 color: '#fff',
                 borderRadius: 4,
-                width: 24,
-                height: 24,
+                width: 22,
+                height: 22,
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
@@ -457,7 +462,7 @@ export const TableLayoutManager: React.FC = () => {
               }}
               title="Increase Columns"
             >
-              <Plus size={13} />
+              <Plus size={12} />
             </button>
           </div>
 
@@ -466,14 +471,14 @@ export const TableLayoutManager: React.FC = () => {
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: 6,
+              gap: 4,
               background: 'var(--color-bg-elevated)',
               border: '1px solid var(--color-border)',
-              padding: '4px 10px',
+              padding: '3px 8px',
               borderRadius: 8,
             }}
           >
-            <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-secondary)' }}>
+            <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-secondary)' }}>
               {language === 'th' ? 'แถว:' : 'Rows:'}
             </span>
             <button
@@ -483,8 +488,8 @@ export const TableLayoutManager: React.FC = () => {
                 border: 'none',
                 color: '#fff',
                 borderRadius: 4,
-                width: 24,
-                height: 24,
+                width: 22,
+                height: 22,
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
@@ -492,9 +497,9 @@ export const TableLayoutManager: React.FC = () => {
               }}
               title="Decrease Rows"
             >
-              <Minus size={13} />
+              <Minus size={12} />
             </button>
-            <span style={{ fontSize: 14, fontWeight: 800, color: '#fff', minWidth: 20, textAlign: 'center', fontFamily: 'var(--font-mono)' }}>
+            <span style={{ fontSize: 13, fontWeight: 800, color: '#fff', minWidth: 18, textAlign: 'center', fontFamily: 'var(--font-mono)' }}>
               {gridRows}
             </span>
             <button
@@ -504,8 +509,8 @@ export const TableLayoutManager: React.FC = () => {
                 border: 'none',
                 color: '#fff',
                 borderRadius: 4,
-                width: 24,
-                height: 24,
+                width: 22,
+                height: 22,
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
@@ -513,7 +518,7 @@ export const TableLayoutManager: React.FC = () => {
               }}
               title="Increase Rows"
             >
-              <Plus size={13} />
+              <Plus size={12} />
             </button>
           </div>
 
@@ -525,16 +530,16 @@ export const TableLayoutManager: React.FC = () => {
             }}
             className="btn-primary"
             style={{
-              padding: '8px 14px',
-              fontSize: 13,
+              padding: '6px 12px',
+              fontSize: 12,
               fontWeight: 700,
               display: 'flex',
               alignItems: 'center',
-              gap: 6,
+              gap: 5,
             }}
           >
-            <Plus size={15} />
-            <span>{language === 'th' ? 'เพิ่มโต๊ะใหม่' : 'Add Table'}</span>
+            <Plus size={14} />
+            <span>{language === 'th' ? 'เพิ่มโต๊ะ' : 'Add Table'}</span>
           </button>
 
           {/* Reset Layout */}
@@ -550,18 +555,18 @@ export const TableLayoutManager: React.FC = () => {
               border: '1px solid var(--color-border)',
               color: 'var(--color-text-secondary)',
               borderRadius: 8,
-              padding: '8px 12px',
-              fontSize: 12,
+              padding: '6px 10px',
+              fontSize: 11,
               fontWeight: 600,
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
-              gap: 5,
+              gap: 4,
             }}
             title="Reset to initial layout"
           >
-            <RotateCcw size={14} />
-            <span>{language === 'th' ? 'คืนค่าเริ่มต้น' : 'Reset'}</span>
+            <RotateCcw size={13} />
+            <span>{language === 'th' ? 'รีเซ็ต' : 'Reset'}</span>
           </button>
 
           {/* Explicit Save and Cancel Controls */}

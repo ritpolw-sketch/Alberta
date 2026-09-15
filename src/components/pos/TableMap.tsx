@@ -25,12 +25,9 @@ export const TableMap: React.FC<TableMapProps> = ({ onSelectTable, compact = fal
   } = usePOS();
 
   // Dynamic Block Sizing (Standard vs Compact for 3-Panel POS)
-  const blockW = compact ? 92 : 140;
-  const blockH = compact ? 74 : 110;
-  const gap = compact ? 8 : 16;
-  const padding = compact ? 10 : 28;
-  const stepX = blockW + gap;
-  const stepY = blockH + gap;
+  const compactCols = 3;
+  const gap = compact ? 6 : 16;
+  const padding = compact ? 8 : 28;
 
   // Grid dimensions (read from persisted settings)
   const [gridCols] = useState<number>(() => {
@@ -48,7 +45,7 @@ export const TableMap: React.FC<TableMapProps> = ({ onSelectTable, compact = fal
   // Container Measurement for "Always Align Center"
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [containerSize, setContainerSize] = useState<{ width: number; height: number }>({
-    width: 800,
+    width: 270,
     height: 650,
   });
 
@@ -82,15 +79,24 @@ export const TableMap: React.FC<TableMapProps> = ({ onSelectTable, compact = fal
     scrollTop: 0,
   });
 
-  // Centering Math (Always align center)
-  const totalGridWidth = gridCols * stepX - gap;
+  // Calculate dynamic block width so all compact columns fit inside panel without clipping
+  const blockW = compact
+    ? Math.max(68, Math.min(88, Math.floor((containerSize.width - padding * 2 - (compactCols - 1) * gap) / compactCols)))
+    : 140;
+  const blockH = compact ? 68 : 110;
+  const stepX = blockW + gap;
+  const stepY = blockH + gap;
+
+  // Active columns in compact mode vs full canvas
+  const activeCols = compact ? compactCols : gridCols;
+  const totalGridWidth = activeCols * stepX - gap;
   const totalGridHeight = gridRows * stepY - gap;
 
-  const canvasWidth = Math.max(containerSize.width, totalGridWidth + padding * 2);
+  const canvasWidth = compact ? containerSize.width : Math.max(containerSize.width, totalGridWidth + padding * 2);
   const canvasHeight = Math.max(containerSize.height, totalGridHeight + padding * 2);
 
   const originX = Math.max(padding, Math.floor((canvasWidth - totalGridWidth) / 2));
-  const originY = Math.max(padding, Math.floor((canvasHeight - totalGridHeight) / 2));
+  const originY = Math.max(padding, compact ? 8 : Math.floor((canvasHeight - totalGridHeight) / 2));
 
   // Helper to get table active order
   const getTableActiveOrder = (tableId: string) => {
@@ -356,7 +362,7 @@ export const TableMap: React.FC<TableMapProps> = ({ onSelectTable, compact = fal
 
             {/* Background Grid Blocks */}
             {Array.from({ length: gridRows }).map((_, r) =>
-              Array.from({ length: gridCols }).map((_, c) => {
+              Array.from({ length: activeCols }).map((_, c) => {
                 const bx = originX + c * stepX;
                 const by = originY + r * stepY;
 
@@ -369,7 +375,7 @@ export const TableMap: React.FC<TableMapProps> = ({ onSelectTable, compact = fal
                       top: by,
                       width: blockW,
                       height: blockH,
-                      borderRadius: compact ? 12 : 16,
+                      borderRadius: compact ? 10 : 16,
                       border: '1px solid rgba(255, 255, 255, 0.03)',
                       pointerEvents: 'none',
                     }}
@@ -382,7 +388,8 @@ export const TableMap: React.FC<TableMapProps> = ({ onSelectTable, compact = fal
             {tables.map((table, index) => {
               const isSelected = activeTableId === table.id;
               const coords = getTableCoordinates(table, index);
-              const posX = originX + coords.col * stepX;
+              const col = compact ? coords.col % activeCols : coords.col;
+              const posX = originX + col * stepX;
               const posY = originY + coords.row * stepY;
 
               const tableOrder = getTableActiveOrder(table.id);
@@ -399,7 +406,7 @@ export const TableMap: React.FC<TableMapProps> = ({ onSelectTable, compact = fal
                     top: posY,
                     width: blockW,
                     height: blockH,
-                    borderRadius: compact ? 12 : 16,
+                    borderRadius: compact ? 10 : 16,
                     background: isSelected
                       ? 'linear-gradient(135deg, rgba(245, 158, 11, 0.28), rgba(217, 119, 6, 0.15))'
                       : totalAmount > 0
@@ -411,17 +418,17 @@ export const TableMap: React.FC<TableMapProps> = ({ onSelectTable, compact = fal
                         ? '1.5px solid rgba(245, 158, 11, 0.45)'
                         : '1px solid rgba(255, 255, 255, 0.1)',
                     boxShadow: isSelected
-                      ? '0 0 16px rgba(245, 158, 11, 0.4), inset 0 0 10px rgba(245, 158, 11, 0.15)'
+                      ? '0 0 14px rgba(245, 158, 11, 0.4), inset 0 0 8px rgba(245, 158, 11, 0.15)'
                       : totalAmount > 0
-                        ? '0 4px 14px rgba(0, 0, 0, 0.35)'
-                        : '0 2px 8px rgba(0, 0, 0, 0.25)',
+                        ? '0 3px 10px rgba(0, 0, 0, 0.35)'
+                        : '0 2px 6px rgba(0, 0, 0, 0.25)',
                     cursor: 'pointer',
                     display: 'flex',
                     flexDirection: 'column',
                     alignItems: 'center',
                     justifyContent: 'center',
                     textAlign: 'center',
-                    gap: compact ? 2 : 3,
+                    gap: compact ? 1 : 3,
                     transition: 'all 0.15s ease',
                     zIndex: isSelected ? 5 : 1,
                   }}
@@ -429,7 +436,7 @@ export const TableMap: React.FC<TableMapProps> = ({ onSelectTable, compact = fal
                   {/* Table Number */}
                   <div
                     style={{
-                      fontSize: compact ? 18 : 26,
+                      fontSize: compact ? 16 : 26,
                       fontWeight: 900,
                       color: isSelected ? 'var(--color-primary)' : '#fff',
                       lineHeight: 1,
@@ -444,12 +451,12 @@ export const TableMap: React.FC<TableMapProps> = ({ onSelectTable, compact = fal
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      gap: 3,
-                      fontSize: compact ? 10 : 11,
+                      gap: 2,
+                      fontSize: compact ? 9 : 11,
                       color: 'var(--color-text-secondary)',
                     }}
                   >
-                    <Users size={compact ? 10 : 12} />
+                    <Users size={compact ? 9 : 12} />
                     <span>{table.capacity} {language === 'th' ? 'ที่นั่ง' : 'seats'}</span>
                   </div>
 
