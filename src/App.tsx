@@ -18,6 +18,8 @@ import {
   Key,
   Cpu,
   Utensils,
+  Users,
+  Settings as SettingsIcon,
 } from 'lucide-react';
 
 // Code-split secondary views to prioritize POS Master resources first
@@ -106,6 +108,12 @@ const POSContent: React.FC = () => {
       icon:
         adminSubTab === 'procurement' ? (
           <Bot size={15} />
+        ) : adminSubTab === 'api_keys' ? (
+          <Key size={15} />
+        ) : adminSubTab === 'settings' ? (
+          <SettingsIcon size={15} />
+        ) : adminSubTab === 'employees' ? (
+          <Users size={15} />
         ) : adminSubTab === 'shifts' ? (
           <Clock size={15} />
         ) : adminSubTab === 'bills' ? (
@@ -116,16 +124,26 @@ const POSContent: React.FC = () => {
       th:
         adminSubTab === 'procurement'
           ? 'จัดซื้อ & LINE Agent'
+          : adminSubTab === 'api_keys'
+          ? 'API Key & โปรแกรมบัญชี'
+          : adminSubTab === 'settings'
+          ? 'ตั้งค่าระบบ (System Setup)'
+          : adminSubTab === 'employees'
+          ? 'จัดการพนักงาน & สิทธิ์'
           : adminSubTab === 'shifts'
           ? 'จัดการกะ'
           : adminSubTab === 'bills'
           ? 'ประวัติบิล (Bill Logs)'
-          : currentStaff?.role === 'owner' || currentStaff?.role === 'admin'
-          ? 'เจ้าของร้าน (Admin)'
-          : 'จัดการระบบ',
+          : 'เจ้าของร้าน (Admin)',
       en:
         adminSubTab === 'procurement'
           ? 'Procurement Agent'
+          : adminSubTab === 'api_keys'
+          ? 'API Keys & Accounting'
+          : adminSubTab === 'settings'
+          ? 'System Setup'
+          : adminSubTab === 'employees'
+          ? 'User Access Control'
           : adminSubTab === 'shifts'
           ? 'Manage Shifts'
           : adminSubTab === 'bills'
@@ -282,19 +300,10 @@ const POSContent: React.FC = () => {
                   <>
                     <div style={{ height: 1, background: 'var(--color-border)', margin: '4px 0' }} />
                     <div style={{ padding: '4px 8px 2px', fontSize: 10, fontWeight: 800, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                      การจัดการระบบ
+                      การจัดการระบบ (System Management)
                     </div>
-                    <button
-                      onClick={() => {
-                        setAdminSubTab('procurement');
-                        handleTabClick('admin');
-                      }}
-                      className={`nav-item ${activeTab === 'admin' && adminSubTab === 'procurement' ? 'active' : ''}`}
-                    >
-                      <Bot size={16} style={{ color: '#06b6d4' }} />
-                      <span>จัดซื้อ & LINE Agent</span>
-                    </button>
 
+                    {/* 1. API Key & Accounting */}
                     <button
                       onClick={() => {
                         setAdminSubTab('api_keys');
@@ -306,15 +315,52 @@ const POSContent: React.FC = () => {
                       <span>API Key & โปรแกรมบัญชี</span>
                     </button>
 
+                    {/* 2. System Setup & Preferences */}
+                    <button
+                      onClick={() => {
+                        setAdminSubTab('settings');
+                        handleTabClick('admin');
+                      }}
+                      className={`nav-item ${activeTab === 'admin' && adminSubTab === 'settings' ? 'active' : ''}`}
+                    >
+                      <SettingsIcon size={16} style={{ color: '#f59e0b' }} />
+                      <span>ตั้งค่าระบบ & ค่าเริ่มต้น (System Setup)</span>
+                    </button>
+
+                    {/* 3. Account Permission & User Access Control */}
+                    <button
+                      onClick={() => {
+                        setAdminSubTab('employees');
+                        handleTabClick('admin');
+                      }}
+                      className={`nav-item ${activeTab === 'admin' && adminSubTab === 'employees' ? 'active' : ''}`}
+                    >
+                      <Users size={16} style={{ color: '#38bdf8' }} />
+                      <span>จัดการพนักงาน & สิทธิ์ผู้ใช้ (User Access)</span>
+                    </button>
+
+                    {/* 4. LINE AI Agent */}
+                    <button
+                      onClick={() => {
+                        setAdminSubTab('procurement');
+                        handleTabClick('admin');
+                      }}
+                      className={`nav-item ${activeTab === 'admin' && adminSubTab === 'procurement' ? 'active' : ''}`}
+                    >
+                      <Bot size={16} style={{ color: '#06b6d4' }} />
+                      <span>จัดซื้อ & LINE Agent</span>
+                    </button>
+
+                    {/* 5. Owner Dashboard */}
                     <button
                       onClick={() => {
                         setAdminSubTab('dashboard');
                         handleTabClick('admin');
                       }}
-                      className={`nav-item ${activeTab === 'admin' && adminSubTab !== 'shifts' && adminSubTab !== 'bills' && adminSubTab !== 'procurement' && adminSubTab !== 'api_keys' ? 'active' : ''}`}
+                      className={`nav-item ${activeTab === 'admin' && adminSubTab === 'dashboard' ? 'active' : ''}`}
                     >
-                      <BarChart3 size={16} />
-                      <span>เจ้าของร้าน (Admin)</span>
+                      <BarChart3 size={16} style={{ color: '#10b981' }} />
+                      <span>ภาพรวมเจ้าของร้าน (Owner Preference)</span>
                     </button>
                   </>
                 )}
