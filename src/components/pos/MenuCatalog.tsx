@@ -4,7 +4,7 @@ import type { MenuItem } from '../../types/pos';
 import { Plus, AlertCircle, Check } from 'lucide-react';
 
 interface MenuCatalogProps {
-  onSelectItem: (item: MenuItem) => void;
+  onSelectItem: (item: MenuItem, cardRect?: DOMRect) => void;
   onCustomizeItem?: (item: MenuItem) => void;
 }
 
@@ -17,9 +17,10 @@ export const MenuCatalog: React.FC<MenuCatalogProps> = ({ onSelectItem }) => {
     return activeCategory === 'all' || item.categoryId === activeCategory;
   });
 
-  const handleCardClick = (item: MenuItem) => {
+  const handleCardClick = (item: MenuItem, e: React.MouseEvent<HTMLDivElement>) => {
     if (!item.inStock) return;
-    onSelectItem(item);
+    const rect = e.currentTarget.getBoundingClientRect();
+    onSelectItem(item, rect);
     setJustAddedId(item.id);
     setTimeout(() => {
       setJustAddedId((curr) => (curr === item.id ? null : curr));
@@ -106,7 +107,8 @@ export const MenuCatalog: React.FC<MenuCatalogProps> = ({ onSelectItem }) => {
             return (
               <div
                 key={item.id}
-                onClick={() => handleCardClick(item)}
+                data-item-id={item.id}
+                onClick={(e) => handleCardClick(item, e)}
                 style={{
                   background: isJustAdded ? 'rgba(245, 158, 11, 0.18)' : 'var(--color-bg-elevated)',
                   border: isJustAdded

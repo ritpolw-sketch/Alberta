@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { usePOS } from '../../context/POSContext';
 import { TableMap } from './TableMap';
 import { OrderPanel } from './OrderPanel';
@@ -9,6 +9,20 @@ import {
   LayoutGrid,
 } from 'lucide-react';
 import type { MenuItem } from '../../types/pos';
+
+interface FlyingItem {
+  instanceId: string;
+  imageUrl?: string;
+  nameTh: string;
+  nameEn: string;
+  price: number;
+  startX: number;
+  startY: number;
+  startWidth: number;
+  startHeight: number;
+  deltaX: number;
+  deltaY: number;
+}
 
 export const POSOrderView: React.FC = () => {
   const {
@@ -21,6 +35,9 @@ export const POSOrderView: React.FC = () => {
     setActiveModal,
     language,
   } = usePOS();
+
+  const [flyingItems, setFlyingItems] = useState<FlyingItem[]>([]);
+  const [isCartPulsing, setIsCartPulsing] = useState(false);
 
   // Auto-select first table if none selected so cashier immediately sees the 3-panel workspace in action
   useEffect(() => {
@@ -42,8 +59,137 @@ export const POSOrderView: React.FC = () => {
     setActiveModal('modifier');
   };
 
+  const triggerFlyToCart = (item: MenuItem, cardRect?: DOMRect) => {
+    let startX = 500;
+    let startY = 300;
+    let startWidth = 110;
+    let startHeight = 90;
+
+    if (cardRect) {
+      startX = cardRect.left;
+      startY = cardRect.top;
+      startWidth = cardRect.width;
+      startHeight = cardRect.height;
+    } else {
+      const cardEl = document.querySelector(`[data-item-id="${item.id}"]`);
+      if (cardEl) {
+        const rect = cardEl.getBoundingClientRect();
+        startX = rect.left;
+        startY = rect.top;
+        startWidth = rect.width;
+        startHeight = rect.height;
+      }
+    }
+
+    const targetEl = document.getElementById('pos-order-panel-target');
+    let targetX = window.innerWidth * 0.35;
+    let targetY = 160;
+
+    if (targetEl) {
+      const tRect = targetEl.getBoundingClientRect();
+      targetX = tRect.left + Math.min(tRect.width / 2, 140);
+      targetY = tRect.top + 100;
+    }
+
+    const deltaX = targetX - startX;
+    const deltaY = targetY - startY;
+    const instanceId = `${item.id}-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+
+    const newFly: FlyingItem = {
+      instanceId,
+      imageUrl: item.imageUrl,
+      nameTh: item.nameTh,
+      nameEn: item.nameEn,
+      price: item.price,
+      startX,
+      startY,
+      startWidth,
+      startHeight,
+      deltaX,
+      deltaY,
+    };
+
+    setFlyingItems((prev) => [...prev, newFly]);
+
+    // Trigger cart bounce pulse when item lands (~450ms)
+    setTimeout(() => {
+      setIsCartPulsing(true);
+      setTimeout(() => setIsCartPulsing(false), 380);
+    }, 450);
+
+    // Remove flying instance when animation finishes (~550ms)
+    setTimeout(() => {
+      setFlyingItems((prev) => prev.filter((f) => f.instanceId !== instanceId));
+    }, 550);
+  };
+
+  const handleSelectItem = (item: MenuItem, cardRect?: DOMRect) => {
+    if (!activeTableId && tables.length > 0) {
+      setActiveTableId(tables[0].id);
+    }
+    triggerFlyToCart(item, cardRect);
+    quickAddItemToOrder(item);
+  };
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100%', overflow: 'hidden' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100%', overflow: 'hidden', position: 'relative' }}>
+      {/* Flying Menu Items Micro-interaction Layer */}
+      {flyingItems.map((fly) => (
+        <div
+          key={fly.instanceId}
+          className="flying-menu-item"
+          style={{
+            left: fly.startX,
+            top: fly.startY,
+            width: fly.startWidth || 100,
+            height: fly.startHeight || 90,
+            '--fly-x': `${fly.deltaX}px`,
+            '--fly-y': `${fly.deltaY}px`,
+          } as React.CSSProperties}
+        >
+          {fly.imageUrl ? (
+            <img
+              src={fly.imageUrl}
+              alt={fly.nameTh}
+              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+            />
+          ) : (
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                height: '100%',
+                fontSize: 32,
+                background: 'var(--color-bg-card)',
+              }}
+            >
+              🍽️
+            </div>
+          )}
+          <div
+            style={{
+              position: 'absolute',
+              bottom: 0,
+              left: 0,
+              right: 0,
+              background: 'rgba(9, 13, 22, 0.88)',
+              color: 'var(--color-primary)',
+              fontSize: 10,
+              fontWeight: 800,
+              padding: '2px 4px',
+              textAlign: 'center',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              borderTop: '1px solid rgba(245, 158, 11, 0.4)',
+            }}
+          >
+            +1 ฿{fly.price}
+          </div>
+        </div>
+      ))}
+
       {/* Minimal Active Table Status Bar */}
       <div
         style={{
@@ -151,6 +297,8 @@ export const POSOrderView: React.FC = () => {
 
         {/* Panel 2: Tables bill รายการอาหารที่สั่ง (~33% width, 320px-380px) */}
         <div
+          id="pos-order-panel-target"
+          className={isCartPulsing ? 'cart-bounce-pulse' : ''}
           style={{
             width: '33%',
             minWidth: 320,
@@ -162,6 +310,7 @@ export const POSOrderView: React.FC = () => {
             overflow: 'hidden',
             background: 'var(--color-bg-card)',
             flexShrink: 0,
+            transition: 'border-color 0.2s ease, box-shadow 0.2s ease',
           }}
         >
           <OrderPanel hideMenuToggle={true} />
@@ -180,12 +329,7 @@ export const POSOrderView: React.FC = () => {
           }}
         >
           <MenuCatalog
-            onSelectItem={(item) => {
-              if (!activeTableId && tables.length > 0) {
-                setActiveTableId(tables[0].id);
-              }
-              quickAddItemToOrder(item);
-            }}
+            onSelectItem={handleSelectItem}
             onCustomizeItem={handleCustomizeItem}
           />
         </div>
@@ -193,4 +337,3 @@ export const POSOrderView: React.FC = () => {
     </div>
   );
 };
-

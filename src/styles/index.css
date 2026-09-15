@@ -145,6 +145,60 @@ select {
   }
 }
 
+/* Flying Item Micro-interaction Keyframes & Classes */
+@keyframes flyToCartArc {
+  0% {
+    transform: translate3d(0, 0, 0) scale(1) rotate(0deg);
+    opacity: 1;
+    box-shadow: 0 10px 25px rgba(245, 158, 11, 0.7), 0 0 15px rgba(245, 158, 11, 0.4);
+    filter: brightness(1.1);
+  }
+  40% {
+    transform: translate3d(calc(var(--fly-x) * 0.45), calc(var(--fly-y) * 0.25 - 45px), 0) scale(0.85) rotate(-12deg);
+    opacity: 0.95;
+    box-shadow: 0 12px 30px rgba(245, 158, 11, 0.8), 0 0 25px rgba(245, 158, 11, 0.6);
+  }
+  85% {
+    transform: translate3d(calc(var(--fly-x) * 0.88), calc(var(--fly-y) * 0.92), 0) scale(0.4) rotate(8deg);
+    opacity: 0.85;
+  }
+  100% {
+    transform: translate3d(var(--fly-x), var(--fly-y), 0) scale(0.18) rotate(18deg);
+    opacity: 0;
+  }
+}
+
+.flying-menu-item {
+  position: fixed;
+  z-index: 9999;
+  pointer-events: none;
+  animation: flyToCartArc 0.55s cubic-bezier(0.16, 0.95, 0.3, 1) forwards;
+  will-change: transform, opacity;
+  border-radius: var(--radius-md);
+  border: 2px solid var(--color-primary);
+  background: var(--color-bg-card);
+  overflow: hidden;
+  box-shadow: 0 10px 25px rgba(245, 158, 11, 0.6);
+}
+
+@keyframes cartBouncePulse {
+  0% {
+    transform: scale(1);
+  }
+  35% {
+    transform: scale(1.025);
+    border-color: var(--color-primary);
+    box-shadow: 0 0 25px rgba(245, 158, 11, 0.45), inset 0 0 15px rgba(245, 158, 11, 0.15);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.cart-bounce-pulse {
+  animation: cartBouncePulse 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
 /* Layout Utilities */
 .app-container {
   display: flex;
