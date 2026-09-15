@@ -231,9 +231,9 @@ const POSContent: React.FC = () => {
                 <button
                   onClick={() => {
                     setAdminSubTab('shifts');
-                    handleTabClick('admin');
+                    handleTabClick('pos');
                   }}
-                  className={`nav-item ${activeTab === 'admin' && adminSubTab === 'shifts' ? 'active' : ''}`}
+                  className={`nav-item ${activeTab === 'pos' && adminSubTab === 'shifts' ? 'active' : ''}`}
                   style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -257,9 +257,9 @@ const POSContent: React.FC = () => {
                 <button
                   onClick={() => {
                     setAdminSubTab('bills');
-                    handleTabClick('admin');
+                    handleTabClick('pos');
                   }}
-                  className={`nav-item ${activeTab === 'admin' && adminSubTab === 'bills' ? 'active' : ''}`}
+                  className={`nav-item ${activeTab === 'pos' && adminSubTab === 'bills' ? 'active' : ''}`}
                 >
                   <Receipt size={16} />
                   <span>ประวัติบิล (Bill Logs)</span>
@@ -500,7 +500,7 @@ const POSContent: React.FC = () => {
           <button
             onClick={() => {
               setAdminSubTab('shifts');
-              setActiveTab('admin');
+              setActiveTab('pos');
             }}
             title="คลิกเพื่อจัดการกะและเปิด/ปิดลิ้นชักเงิน"
             style={{

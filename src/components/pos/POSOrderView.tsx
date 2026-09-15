@@ -3,6 +3,8 @@ import { usePOS } from '../../context/POSContext';
 import { TableMap } from './TableMap';
 import { OrderPanel } from './OrderPanel';
 import { MenuCatalog } from './MenuCatalog';
+import { BillLogs } from '../admin/BillLogs';
+import { ShiftManagePage } from '../admin/ShiftManagePage';
 import {
   Receipt,
   History,
@@ -34,14 +36,23 @@ export const POSOrderView: React.FC = () => {
     setSelectedItemForModifier,
     setActiveModal,
     language,
-    activeTab,
-    setActiveTab,
     adminSubTab,
     setAdminSubTab,
   } = usePOS();
 
   const [flyingItems, setFlyingItems] = useState<FlyingItem[]>([]);
   const [isCartPulsing, setIsCartPulsing] = useState(false);
+  const [subTab, setSubTab] = useState<'pos' | 'bills' | 'shifts'>(
+    adminSubTab === 'bills' ? 'bills' : adminSubTab === 'shifts' ? 'shifts' : 'pos'
+  );
+
+  useEffect(() => {
+    if (adminSubTab === 'bills') {
+      setSubTab('bills');
+    } else if (adminSubTab === 'shifts') {
+      setSubTab('shifts');
+    }
+  }, [adminSubTab]);
 
   // Auto-select first table if none selected so cashier immediately sees the 3-panel workspace in action
   useEffect(() => {
@@ -208,16 +219,19 @@ export const POSOrderView: React.FC = () => {
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           {/* 1. รายการสั่ง */}
           <button
-            onClick={() => setActiveTab('pos')}
+            onClick={() => {
+              setSubTab('pos');
+              setAdminSubTab('dashboard');
+            }}
             style={{
               display: 'flex',
               alignItems: 'center',
               gap: 6,
               padding: '6px 14px',
               borderRadius: 8,
-              border: activeTab === 'pos' ? '1px solid rgba(245, 158, 11, 0.4)' : '1px solid var(--color-border)',
-              background: activeTab === 'pos' ? 'linear-gradient(135deg, rgba(245, 158, 11, 0.2), rgba(217, 119, 6, 0.1))' : 'rgba(255, 255, 255, 0.04)',
-              color: activeTab === 'pos' ? 'var(--color-primary)' : 'var(--color-text-secondary)',
+              border: subTab === 'pos' ? '1px solid rgba(245, 158, 11, 0.4)' : '1px solid var(--color-border)',
+              background: subTab === 'pos' ? 'linear-gradient(135deg, rgba(245, 158, 11, 0.2), rgba(217, 119, 6, 0.1))' : 'rgba(255, 255, 255, 0.04)',
+              color: subTab === 'pos' ? 'var(--color-primary)' : 'var(--color-text-secondary)',
               fontSize: 13,
               fontWeight: 700,
               cursor: 'pointer',
@@ -231,8 +245,8 @@ export const POSOrderView: React.FC = () => {
           {/* 2. บิลย้อนหลัง */}
           <button
             onClick={() => {
+              setSubTab('bills');
               setAdminSubTab('bills');
-              setActiveTab('admin');
             }}
             style={{
               display: 'flex',
@@ -240,9 +254,9 @@ export const POSOrderView: React.FC = () => {
               gap: 6,
               padding: '6px 14px',
               borderRadius: 8,
-              border: activeTab === 'admin' && adminSubTab === 'bills' ? '1px solid rgba(245, 158, 11, 0.4)' : '1px solid var(--color-border)',
-              background: activeTab === 'admin' && adminSubTab === 'bills' ? 'linear-gradient(135deg, rgba(245, 158, 11, 0.2), rgba(217, 119, 6, 0.1))' : 'rgba(255, 255, 255, 0.04)',
-              color: activeTab === 'admin' && adminSubTab === 'bills' ? 'var(--color-primary)' : 'var(--color-text-secondary)',
+              border: subTab === 'bills' ? '1px solid rgba(245, 158, 11, 0.4)' : '1px solid var(--color-border)',
+              background: subTab === 'bills' ? 'linear-gradient(135deg, rgba(245, 158, 11, 0.2), rgba(217, 119, 6, 0.1))' : 'rgba(255, 255, 255, 0.04)',
+              color: subTab === 'bills' ? 'var(--color-primary)' : 'var(--color-text-secondary)',
               fontSize: 13,
               fontWeight: 700,
               cursor: 'pointer',
@@ -256,8 +270,8 @@ export const POSOrderView: React.FC = () => {
           {/* 3. จัดการกะ */}
           <button
             onClick={() => {
+              setSubTab('shifts');
               setAdminSubTab('shifts');
-              setActiveTab('admin');
             }}
             style={{
               display: 'flex',
@@ -265,9 +279,9 @@ export const POSOrderView: React.FC = () => {
               gap: 6,
               padding: '6px 14px',
               borderRadius: 8,
-              border: activeTab === 'admin' && adminSubTab === 'shifts' ? '1px solid rgba(245, 158, 11, 0.4)' : '1px solid var(--color-border)',
-              background: activeTab === 'admin' && adminSubTab === 'shifts' ? 'linear-gradient(135deg, rgba(245, 158, 11, 0.2), rgba(217, 119, 6, 0.1))' : 'rgba(255, 255, 255, 0.04)',
-              color: activeTab === 'admin' && adminSubTab === 'shifts' ? 'var(--color-primary)' : 'var(--color-text-secondary)',
+              border: subTab === 'shifts' ? '1px solid rgba(245, 158, 11, 0.4)' : '1px solid var(--color-border)',
+              background: subTab === 'shifts' ? 'linear-gradient(135deg, rgba(245, 158, 11, 0.2), rgba(217, 119, 6, 0.1))' : 'rgba(255, 255, 255, 0.04)',
+              color: subTab === 'shifts' ? 'var(--color-primary)' : 'var(--color-text-secondary)',
               fontSize: 13,
               fontWeight: 700,
               cursor: 'pointer',
@@ -302,74 +316,88 @@ export const POSOrderView: React.FC = () => {
         )}
       </div>
 
-      {/* Main 3-Panels Layout: 1. Tables Blocks | 2. Tables Bill | 3. Menu 1-Click */}
-      <div
-        className="pos-3panel-container"
-        style={{
-          flex: 1,
-          display: 'flex',
-          overflow: 'hidden',
-          width: '100%',
-          height: '100%',
-        }}
-      >
-        {/* Panel 1: Tables blocks ผังโต๊ะ (~26% width, 260px-300px) */}
+      {/* Dynamic Sub-Tab View Rendering */}
+      {subTab === 'pos' && (
         <div
-          style={{
-            width: '26%',
-            minWidth: 260,
-            maxWidth: 300,
-            height: '100%',
-            borderRight: '1px solid var(--color-border)',
-            display: 'flex',
-            flexDirection: 'column',
-            overflow: 'hidden',
-            background: '#070a11',
-            flexShrink: 0,
-          }}
-        >
-          <TableMap compact={true} onSelectTable={(tableId) => setActiveTableId(tableId)} />
-        </div>
-
-        {/* Panel 2: Tables bill รายการอาหารที่สั่ง (~33% width, 320px-380px) */}
-        <div
-          id="pos-order-panel-target"
-          className={isCartPulsing ? 'cart-bounce-pulse' : ''}
-          style={{
-            width: '33%',
-            minWidth: 320,
-            maxWidth: 380,
-            height: '100%',
-            borderRight: '1px solid var(--color-border)',
-            display: 'flex',
-            flexDirection: 'column',
-            overflow: 'hidden',
-            background: 'var(--color-bg-card)',
-            flexShrink: 0,
-            transition: 'border-color 0.2s ease, box-shadow 0.2s ease',
-          }}
-        >
-          <OrderPanel hideMenuToggle={true} />
-        </div>
-
-        {/* Panel 3: Menu One-click add to table (Remaining width, min 350px) */}
-        <div
+          className="pos-3panel-container"
           style={{
             flex: 1,
-            minWidth: 350,
-            height: '100%',
             display: 'flex',
-            flexDirection: 'column',
             overflow: 'hidden',
-            background: 'var(--color-bg-main)',
+            width: '100%',
+            height: '100%',
           }}
         >
-          <MenuCatalog
-            onSelectItem={handleSelectItem}
-            onCustomizeItem={handleCustomizeItem}
-          />
+          {/* Panel 1: Tables blocks ผังโต๊ะ (~26% width, 260px-300px) */}
+          <div
+            style={{
+              width: '26%',
+              minWidth: 260,
+              maxWidth: 300,
+              height: '100%',
+              borderRight: '1px solid var(--color-border)',
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'hidden',
+              background: '#070a11',
+              flexShrink: 0,
+            }}
+          >
+            <TableMap compact={true} onSelectTable={(tableId) => setActiveTableId(tableId)} />
+          </div>
+
+          {/* Panel 2: Tables bill รายการอาหารที่สั่ง (~33% width, 320px-380px) */}
+          <div
+            id="pos-order-panel-target"
+            className={isCartPulsing ? 'cart-bounce-pulse' : ''}
+            style={{
+              width: '33%',
+              minWidth: 320,
+              maxWidth: 380,
+              height: '100%',
+              borderRight: '1px solid var(--color-border)',
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'hidden',
+              background: 'var(--color-bg-card)',
+              flexShrink: 0,
+              transition: 'border-color 0.2s ease, box-shadow 0.2s ease',
+            }}
+          >
+            <OrderPanel hideMenuToggle={true} />
+          </div>
+
+          {/* Panel 3: Menu One-click add to table (Remaining width, min 350px) */}
+          <div
+            style={{
+              flex: 1,
+              minWidth: 350,
+              height: '100%',
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'hidden',
+              background: 'var(--color-bg-main)',
+            }}
+          >
+            <MenuCatalog
+              onSelectItem={handleSelectItem}
+              onCustomizeItem={handleCustomizeItem}
+            />
+          </div>
         </div>
-      </div>
+      )}
+
+      {subTab === 'bills' && (
+        <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px', background: 'var(--color-bg-base)' }}>
+          <BillLogs />
+        </div>
+      )}
+
+      {subTab === 'shifts' && (
+        <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px', background: 'var(--color-bg-base)' }}>
+          <ShiftManagePage />
+        </div>
+      )}
     </div>
   );
 };
