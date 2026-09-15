@@ -138,6 +138,7 @@ export const TableOrderQRModal: React.FC<TableOrderQRModalProps> = ({
 
   return (
     <div
+      onClick={onClose}
       style={{
         position: 'fixed',
         inset: 0,
@@ -151,6 +152,7 @@ export const TableOrderQRModal: React.FC<TableOrderQRModalProps> = ({
       }}
     >
       <div
+        onClick={(e) => e.stopPropagation()}
         style={{
           background: 'var(--color-bg-card)',
           border: '1.5px solid var(--color-border-glow)',
