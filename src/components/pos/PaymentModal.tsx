@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { usePOS } from '../../context/POSContext';
 import type { PaymentMethod } from '../../types/pos';
 import { generatePromptPayPayload } from '../../utils/promptpay';
@@ -30,46 +30,49 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose }) =
     setActiveModal,
   } = usePOS();
 
-  const paymentChannels = settings.paymentChannels || {
+  const paymentChannels = useMemo(() => settings.paymentChannels || {
     cash: { enabled: true, allowQuickDenominations: true },
-    scan: { enabled: true, accountName: settings.promptPayName, accountNumber: settings.promptPayId, bankName: 'PromptPay', qrType: 'generated' },
+    scan: { enabled: true, accountName: settings.promptPayName, accountNumber: settings.promptPayId, bankName: 'PromptPay', qrType: 'generated', customQrUrl: '' },
     card: { enabled: true, gatewayType: 'edc_terminal', terminalId: 'EDC-882194', feePercentage: 2.5 },
-  };
+  }, [settings.paymentChannels, settings.promptPayName, settings.promptPayId]);
 
-  const availableMethods: { id: PaymentMethod; labelTh: string; labelEn: string; icon: React.ReactNode; color: string; border: string; bg: string }[] = [];
-  if (paymentChannels.scan?.enabled) {
-    availableMethods.push({
-      id: 'promptpay',
-      labelTh: paymentChannels.scan.qrType === 'custom_image' ? 'สแกน QR ร้าน' : 'PromptPay QR',
-      labelEn: 'QR Scan',
-      icon: <QrCode size={22} />,
-      color: '#60a5fa',
-      border: '#3b82f6',
-      bg: 'rgba(59, 130, 246, 0.15)',
-    });
-  }
-  if (paymentChannels.cash?.enabled) {
-    availableMethods.push({
-      id: 'cash',
-      labelTh: 'เงินสด (Cash)',
-      labelEn: 'Cash',
-      icon: <Banknote size={22} />,
-      color: '#34d399',
-      border: '#10b981',
-      bg: 'rgba(16, 185, 129, 0.15)',
-    });
-  }
-  if (paymentChannels.card?.enabled) {
-    availableMethods.push({
-      id: 'card',
-      labelTh: 'บัตรเครดิต/เดบิต',
-      labelEn: 'Card / EDC',
-      icon: <CreditCard size={22} />,
-      color: 'var(--color-primary)',
-      border: 'var(--color-primary)',
-      bg: 'rgba(245, 158, 11, 0.15)',
-    });
-  }
+  const availableMethods = useMemo(() => {
+    const methods: { id: PaymentMethod; labelTh: string; labelEn: string; icon: React.ReactNode; color: string; border: string; bg: string }[] = [];
+    if (paymentChannels.scan?.enabled) {
+      methods.push({
+        id: 'promptpay',
+        labelTh: paymentChannels.scan.qrType === 'custom_image' ? 'สแกน QR ร้าน' : 'PromptPay QR',
+        labelEn: 'QR Scan',
+        icon: <QrCode size={22} />,
+        color: '#60a5fa',
+        border: '#3b82f6',
+        bg: 'rgba(59, 130, 246, 0.15)',
+      });
+    }
+    if (paymentChannels.cash?.enabled) {
+      methods.push({
+        id: 'cash',
+        labelTh: 'เงินสด (Cash)',
+        labelEn: 'Cash',
+        icon: <Banknote size={22} />,
+        color: '#34d399',
+        border: '#10b981',
+        bg: 'rgba(16, 185, 129, 0.15)',
+      });
+    }
+    if (paymentChannels.card?.enabled) {
+      methods.push({
+        id: 'card',
+        labelTh: 'บัตรเครดิต/เดบิต',
+        labelEn: 'Card / EDC',
+        icon: <CreditCard size={22} />,
+        color: 'var(--color-primary)',
+        border: 'var(--color-primary)',
+        bg: 'rgba(245, 158, 11, 0.15)',
+      });
+    }
+    return methods;
+  }, [paymentChannels]);
 
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(() => {
     return availableMethods[0]?.id || 'promptpay';
@@ -91,16 +94,22 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose }) =
   const scanAccountName = paymentChannels.scan?.accountName || settings.promptPayName;
   const isCustomQr = paymentChannels.scan?.qrType === 'custom_image' && !!paymentChannels.scan?.customQrUrl;
 
-  // Auto switch if active method is disabled
+  // Reset modal state when modal opens or active order changes
   useEffect(() => {
-    if (availableMethods.length > 0 && !availableMethods.some((m) => m.id === paymentMethod)) {
-      setPaymentMethod(availableMethods[0].id);
+    if (isOpen && activeOrder) {
+      setPaymentSuccess(false);
+      setCashTendered(activeOrder.grandTotal ? activeOrder.grandTotal.toString() : '');
+      setCardLast4('');
+      setSplitCount(1);
+      if (availableMethods.length > 0 && !availableMethods.some((m) => m.id === paymentMethod)) {
+        setPaymentMethod(availableMethods[0].id);
+      }
     }
-  }, [availableMethods, paymentMethod]);
+  }, [isOpen, activeOrder?.id]);
 
   // Generate PromptPay QR when in PromptPay tab (if dynamic generator)
   useEffect(() => {
-    if (paymentMethod === 'promptpay' && canvasRef.current && activeOrder && !isCustomQr) {
+    if (isOpen && paymentMethod === 'promptpay' && canvasRef.current && activeOrder && !isCustomQr) {
       const payload = generatePromptPayPayload(scanAccountNo, grandTotal);
       QRCode.toCanvas(canvasRef.current, payload, {
         width: 160,
@@ -111,14 +120,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose }) =
         },
       }).catch((err) => console.error('PromptPay QR Error:', err));
     }
-  }, [paymentMethod, grandTotal, scanAccountNo, activeOrder, isCustomQr]);
-
-  // Set default cash tendered to exact amount
-  useEffect(() => {
-    if (grandTotal > 0 && !cashTendered) {
-      setCashTendered(grandTotal.toString());
-    }
-  }, [grandTotal]);
+  }, [isOpen, paymentMethod, grandTotal, scanAccountNo, activeOrder, isCustomQr]);
 
   if (!isOpen || !activeOrder) return null;
 

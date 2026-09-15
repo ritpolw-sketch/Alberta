@@ -16,7 +16,7 @@ export const KitchenKDS: React.FC = () => {
     language,
   } = usePOS();
 
-  const [now, setNow] = useState(Date.now());
+  const [now, setNow] = useState(() => Date.now());
 
   // Update timer every 30 seconds
   useEffect(() => {

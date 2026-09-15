@@ -104,9 +104,11 @@ export const ShiftManagePage: React.FC = () => {
     });
   };
 
-  const getShiftDuration = (shift: Shift) => {
+  const [nowTimestamp] = useState(() => Date.now());
+
+  const getShiftDuration = (shift: Shift, currentTimestamp: number = nowTimestamp) => {
     const start = new Date(shift.openedAt).getTime();
-    const end = shift.closedAt ? new Date(shift.closedAt).getTime() : Date.now();
+    const end = shift.closedAt ? new Date(shift.closedAt).getTime() : currentTimestamp;
     const diffMin = Math.floor((end - start) / 60000);
     const h = Math.floor(diffMin / 60);
     const m = diffMin % 60;

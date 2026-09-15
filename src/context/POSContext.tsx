@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import type {
   Table,
   TableStatus,
@@ -23,6 +23,7 @@ import type {
   ApiKey,
   WebhookEndpoint,
   AccountingIntegrationConfig,
+  QueuedCustomerOrder,
 } from '../types/pos';
 import {
   initialCategories,
@@ -151,6 +152,14 @@ interface POSContextType {
   deleteWebhookEndpoint: (webhookId: string) => void;
   updateAccountingConfig: (newCfg: Partial<AccountingIntegrationConfig>) => void;
   triggerTestWebhook: (webhookId: string) => void;
+
+  // Customer Order Queue & Background Worker
+  orderQueue: QueuedCustomerOrder[];
+  workerStatus: 'idle' | 'processing' | 'active';
+  queueCustomerOrder: (orderData: Omit<QueuedCustomerOrder, 'id' | 'submittedAt' | 'status'>) => Promise<string>;
+  clearCompletedQueue: () => void;
+  lastWorkerNotification: { id: string; tableName: string; itemCount: number; time: string } | null;
+  dismissWorkerNotification: () => void;
 }
 
 const POSContext = createContext<POSContextType | undefined>(undefined);
@@ -220,17 +229,10 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [activeTableId, setActiveTableId] = useState<string | null>('t-2');
 
-  const [categories, setCategories] = useState<MenuCategory[]>(initialCategories);
+  const [categories] = useState<MenuCategory[]>(initialCategories);
   const [menuItems, setMenuItems] = useState<MenuItem[]>(initialMenuItems);
-  const [modifierGroups, setModifierGroups] = useState<ModifierGroup[]>(initialModifierGroups);
+  const [modifierGroups] = useState<ModifierGroup[]>(initialModifierGroups);
 
-  // Keep them synced if initialData changes during development
-  useEffect(() => {
-    setMenuItems(initialMenuItems);
-    setCategories(initialCategories);
-    setModifierGroups(initialModifierGroups);
-    setSettings(initialSettings);
-  }, [initialMenuItems, initialCategories, initialModifierGroups, initialSettings]);
 
   // Pre-seed an active order for demonstration
   const [orders, setOrders] = useState<Record<string, Order>>(() => {
@@ -615,16 +617,18 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     let vatAmount = 0;
     let grandTotal = 0;
 
+    const vatPct = (settings.vatRate || 0.07) * 100;
+
     if (!enableVat) {
       vatAmount = 0;
       grandTotal = subtotal + scAmount;
     } else if (isInclusive) {
       // VAT is already included in subtotal
-      vatAmount = Math.round(((subtotal + scAmount) * 7) / 107 * 100) / 100;
+      vatAmount = Math.round(((subtotal + scAmount) * vatPct) / (100 + vatPct) * 100) / 100;
       grandTotal = subtotal + scAmount;
     } else {
       // VAT is added on top
-      vatAmount = Math.round((subtotal + scAmount) * settings.vatRate * 100) / 100;
+      vatAmount = Math.round((subtotal + scAmount) * (settings.vatRate || 0.07) * 100) / 100;
       grandTotal = subtotal + scAmount + vatAmount;
     }
 
@@ -660,90 +664,93 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       status: 'pending',
     };
 
-    let targetOrder = Object.values(orders).find(
-      (o) => o.tableId === effectiveTableId && o.status === 'active'
-    ) || null;
+    setOrders((prevOrders) => {
+      const targetOrder = Object.values(prevOrders).find(
+        (o) => o.tableId === effectiveTableId && o.status === 'active'
+      ) || null;
 
-    if (!targetOrder) {
-      // Create new order
-      const orderId = `ord-${Date.now().toString().slice(-4)}`;
-      const newItems = [newOrderItem];
-      const { subtotal, scAmount, scRate, vatAmount, grandTotal } =
-        calculateOrderTotals(newItems, settings.enableServiceCharge, settings.enableVat, settings.isVatInclusive);
+      if (!targetOrder) {
+        // Create new order
+        const orderId = `ord-${Date.now().toString().slice(-4)}`;
+        const newItems = [newOrderItem];
+        const { subtotal, scAmount, scRate, vatAmount, grandTotal } =
+          calculateOrderTotals(newItems, settings.enableServiceCharge, settings.enableVat, settings.isVatInclusive);
 
-      const createdOrder: Order = {
-        id: orderId,
-        orderNumber: `#${orderId.slice(-4)}`,
-        tableId: effectiveTable.id,
-        tableName: effectiveTable.number,
-        guestCount: effectiveTable.guestCount || 2,
-        items: newItems,
-        status: 'active',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        staffId: currentStaff?.id || 'staff-1',
-        staffName: currentStaff?.name || 'Staff',
-        subtotal,
-        serviceChargeRate: scRate,
-        serviceChargeAmount: scAmount,
-        vatRate: settings.vatRate,
-        vatAmount,
-        isVatInclusive: settings.isVatInclusive,
-        grandTotal,
-      };
-
-      setOrders((prev) => ({ ...prev, [orderId]: createdOrder }));
-      updateTableStatus(effectiveTable.id, 'occupied');
-      setTables((prev) =>
-        prev.map((t) =>
-          t.id === effectiveTable.id ? { ...t, seatedAt: new Date().toISOString() } : t
-        )
-      );
-    } else {
-      // Check if an identical pending item exists, increment if so
-      const modIds = modifiers.map((m) => m.optionId).sort().join(',');
-      const existingIdx = targetOrder.items.findIndex(
-        (i) =>
-          i.menuItemId === menuItem.id &&
-          i.status === 'pending' &&
-          (i.specialInstructions || '') === (instructions || '') &&
-          i.modifiers.map((m) => m.optionId).sort().join(',') === modIds
-      );
-
-      let updatedItems: OrderItem[];
-      if (existingIdx >= 0) {
-        updatedItems = targetOrder.items.map((item, idx) => {
-          if (idx === existingIdx) {
-            const newQty = item.quantity + quantity;
-            return {
-              ...item,
-              quantity: newQty,
-              itemTotal: (menuItem.price + modifierDelta) * newQty,
-            };
-          }
-          return item;
-        });
-      } else {
-        updatedItems = [...targetOrder.items, newOrderItem];
-      }
-
-      const { subtotal, scAmount, scRate, vatAmount, grandTotal } =
-        calculateOrderTotals(updatedItems, settings.enableServiceCharge, settings.enableVat, settings.isVatInclusive);
-
-      setOrders((prev) => ({
-        ...prev,
-        [targetOrder.id]: {
-          ...targetOrder,
-          items: updatedItems,
+        const createdOrder: Order = {
+          id: orderId,
+          orderNumber: `#${orderId.slice(-4)}`,
+          tableId: effectiveTable.id,
+          tableName: effectiveTable.number,
+          guestCount: effectiveTable.guestCount || 2,
+          items: newItems,
+          status: 'active',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          staffId: currentStaff?.id || 'staff-1',
+          staffName: currentStaff?.name || 'Staff',
           subtotal,
           serviceChargeRate: scRate,
           serviceChargeAmount: scAmount,
+          vatRate: settings.vatRate,
           vatAmount,
+          isVatInclusive: settings.isVatInclusive,
           grandTotal,
-          updatedAt: new Date().toISOString(),
-        },
-      }));
-    }
+        };
+
+        return { ...prevOrders, [orderId]: createdOrder };
+      } else {
+        // Check if an identical pending item exists, increment if so
+        const modIds = modifiers.map((m) => m.optionId).sort().join(',');
+        const existingIdx = targetOrder.items.findIndex(
+          (i) =>
+            i.menuItemId === menuItem.id &&
+            i.status === 'pending' &&
+            (i.specialInstructions || '') === (instructions || '') &&
+            i.modifiers.map((m) => m.optionId).sort().join(',') === modIds
+        );
+
+        let updatedItems: OrderItem[];
+        if (existingIdx >= 0) {
+          updatedItems = targetOrder.items.map((item, idx) => {
+            if (idx === existingIdx) {
+              const newQty = item.quantity + quantity;
+              return {
+                ...item,
+                quantity: newQty,
+                itemTotal: (menuItem.price + modifierDelta) * newQty,
+              };
+            }
+            return item;
+          });
+        } else {
+          updatedItems = [...targetOrder.items, newOrderItem];
+        }
+
+        const { subtotal, scAmount, scRate, vatAmount, grandTotal } =
+          calculateOrderTotals(updatedItems, settings.enableServiceCharge, settings.enableVat, settings.isVatInclusive);
+
+        return {
+          ...prevOrders,
+          [targetOrder.id]: {
+            ...targetOrder,
+            items: updatedItems,
+            subtotal,
+            serviceChargeRate: scRate,
+            serviceChargeAmount: scAmount,
+            vatAmount,
+            grandTotal,
+            updatedAt: new Date().toISOString(),
+          },
+        };
+      }
+    });
+
+    updateTableStatus(effectiveTable.id, 'occupied');
+    setTables((prev) =>
+      prev.map((t) =>
+        t.id === effectiveTable.id ? { ...t, seatedAt: t.seatedAt || new Date().toISOString() } : t
+      )
+    );
   };
 
   // Quick 1-Click add to order with smart defaults
@@ -1416,6 +1423,228 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     );
   };
 
+  // Customer Order Queue & Background Worker State
+  const [orderQueue, setOrderQueue] = useState<QueuedCustomerOrder[]>(() => {
+    const saved = localStorage.getItem(`${STORAGE_PREFIX}order_queue`);
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  const [workerStatus, setWorkerStatus] = useState<'idle' | 'processing' | 'active'>('idle');
+  const [lastWorkerNotification, setLastWorkerNotification] = useState<{ id: string; tableName: string; itemCount: number; time: string } | null>(null);
+
+  useEffect(() => {
+    localStorage.setItem(`${STORAGE_PREFIX}order_queue`, JSON.stringify(orderQueue));
+  }, [orderQueue]);
+
+  // Cross-tab / Cross-window event synchronization for Order Queue Worker
+  useEffect(() => {
+    let channel: BroadcastChannel | null = null;
+    try {
+      if (typeof BroadcastChannel !== 'undefined') {
+        channel = new BroadcastChannel('alberta_order_queue_bus');
+        channel.onmessage = (event) => {
+          if (event.data?.type === 'QUEUE_NEW_ORDER' && event.data.order) {
+            setOrderQueue((prev) => {
+              if (prev.some((o) => o.id === event.data.order.id)) return prev;
+              return [event.data.order, ...prev];
+            });
+          }
+        };
+      }
+    } catch (e) {
+      console.warn('BroadcastChannel not supported or restricted', e);
+    }
+
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === `${STORAGE_PREFIX}order_queue` && e.newValue) {
+        try {
+          const parsed = JSON.parse(e.newValue);
+          setOrderQueue(parsed);
+        } catch {}
+      }
+    };
+    window.addEventListener('storage', handleStorage);
+
+    return () => {
+      if (channel) channel.close();
+      window.removeEventListener('storage', handleStorage);
+    };
+  }, []);
+
+  // Background Order Queue Worker Processor
+  const isProcessingQueueRef = useRef(false);
+
+  useEffect(() => {
+    const nextQueued = orderQueue.find((q) => q.status === 'queued');
+    if (!nextQueued || isProcessingQueueRef.current) return;
+
+    isProcessingQueueRef.current = true;
+    setWorkerStatus('processing');
+
+    // Asynchronous background worker ingestion latency (380ms)
+    const timer = setTimeout(() => {
+      const targetTableId = nextQueued.tableId;
+      const targetTable = tables.find((t) => t.id === targetTableId || t.number === nextQueued.tableName);
+      const effectiveTableId = targetTable ? targetTable.id : targetTableId;
+      const effectiveTableName = targetTable ? targetTable.number : nextQueued.tableName;
+
+      const newOrderItems: OrderItem[] = nextQueued.items.map((it) => {
+        const modifierDelta = it.modifiers.reduce((sum, m) => sum + m.priceDelta, 0);
+        return {
+          id: `oi-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+          menuItemId: it.menuItem.id,
+          nameTh: it.menuItem.nameTh,
+          nameEn: it.menuItem.nameEn,
+          imageUrl: it.menuItem.imageUrl,
+          basePrice: it.menuItem.price,
+          quantity: it.quantity,
+          modifiers: it.modifiers,
+          specialInstructions: it.instructions || (nextQueued.guestNote ? `[ลูกค้า]: ${nextQueued.guestNote}` : undefined),
+          itemTotal: (it.menuItem.price + modifierDelta) * it.quantity,
+          status: 'sent_to_kitchen' as const,
+          sentAt: new Date().toISOString(),
+        };
+      });
+
+      setOrders((prevOrders) => {
+        const existingOrder = Object.values(prevOrders).find(
+          (o) => o.tableId === effectiveTableId && o.status === 'active'
+        );
+
+        if (existingOrder) {
+          const updatedItems = [...existingOrder.items, ...newOrderItems];
+          const { subtotal, scAmount, scRate, vatAmount, grandTotal } =
+            calculateOrderTotals(updatedItems, settings.enableServiceCharge, settings.enableVat, settings.isVatInclusive);
+
+          return {
+            ...prevOrders,
+            [existingOrder.id]: {
+              ...existingOrder,
+              items: updatedItems,
+              subtotal,
+              serviceChargeRate: scRate,
+              serviceChargeAmount: scAmount,
+              vatAmount,
+              grandTotal,
+              updatedAt: new Date().toISOString(),
+            },
+          };
+        } else {
+          const orderId = `ord-${Date.now().toString().slice(-4)}`;
+          const { subtotal, scAmount, scRate, vatAmount, grandTotal } =
+            calculateOrderTotals(newOrderItems, settings.enableServiceCharge, settings.enableVat, settings.isVatInclusive);
+
+          const createdOrder: Order = {
+            id: orderId,
+            orderNumber: `#${orderId.slice(-4)}`,
+            tableId: effectiveTableId,
+            tableName: effectiveTableName,
+            guestCount: nextQueued.guestCount || targetTable?.guestCount || 2,
+            items: newOrderItems,
+            status: 'active',
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            staffId: 'staff-customer-self',
+            staffName: `สั่งเองที่โต๊ะ (${effectiveTableName})`,
+            subtotal,
+            serviceChargeRate: scRate,
+            serviceChargeAmount: scAmount,
+            vatRate: settings.vatRate,
+            vatAmount,
+            isVatInclusive: settings.isVatInclusive,
+            grandTotal,
+          };
+
+          return {
+            ...prevOrders,
+            [orderId]: createdOrder,
+          };
+        }
+      });
+
+      // Update table status to ordered
+      updateTableStatus(effectiveTableId, 'ordered');
+      setTables((prev) =>
+        prev.map((t) =>
+          t.id === effectiveTableId ? { ...t, status: 'ordered', seatedAt: t.seatedAt || new Date().toISOString() } : t
+        )
+      );
+
+      // Mark queue item as completed
+      setOrderQueue((prev) =>
+        prev.map((q) =>
+          q.id === nextQueued.id
+            ? { ...q, status: 'completed', processedAt: new Date().toISOString() }
+            : q
+        )
+      );
+
+      // Trigger notification for POS master cashier
+      setLastWorkerNotification({
+        id: nextQueued.id,
+        tableName: effectiveTableName,
+        itemCount: nextQueued.items.reduce((sum, i) => sum + i.quantity, 0),
+        time: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+      });
+
+      // Web Audio API chime
+      try {
+        if (typeof window !== 'undefined' && 'AudioContext' in window) {
+          const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(587.33, ctx.currentTime);
+          osc.frequency.setValueAtTime(880, ctx.currentTime + 0.1);
+          gain.gain.setValueAtTime(0.12, ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
+          osc.start();
+          osc.stop(ctx.currentTime + 0.35);
+        }
+      } catch {}
+
+      setWorkerStatus('idle');
+      isProcessingQueueRef.current = false;
+    }, 380);
+
+    return () => clearTimeout(timer);
+  }, [orderQueue, tables, settings]);
+
+  const queueCustomerOrder = async (
+    orderData: Omit<QueuedCustomerOrder, 'id' | 'submittedAt' | 'status'>
+  ): Promise<string> => {
+    const id = `qord-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+    const newQueueItem: QueuedCustomerOrder = {
+      ...orderData,
+      id,
+      submittedAt: new Date().toISOString(),
+      status: 'queued',
+    };
+
+    setOrderQueue((prev) => [newQueueItem, ...prev]);
+
+    // Broadcast cross-window / cross-tab
+    try {
+      if (typeof BroadcastChannel !== 'undefined') {
+        const channel = new BroadcastChannel('alberta_order_queue_bus');
+        channel.postMessage({ type: 'QUEUE_NEW_ORDER', order: newQueueItem });
+        channel.close();
+      }
+    } catch {}
+
+    return id;
+  };
+
+  const clearCompletedQueue = () => {
+    setOrderQueue((prev) => prev.filter((q) => q.status === 'queued' || q.status === 'processing'));
+  };
+
+  const dismissWorkerNotification = () => {
+    setLastWorkerNotification(null);
+  };
+
   return (
     <POSContext.Provider
       value={{
@@ -1504,6 +1733,12 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         deleteWebhookEndpoint,
         updateAccountingConfig,
         triggerTestWebhook,
+        orderQueue,
+        workerStatus,
+        queueCustomerOrder,
+        clearCompletedQueue,
+        lastWorkerNotification,
+        dismissWorkerNotification,
       }}
     >
       {children}

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { usePOS } from '../../context/POSContext';
 import {
   Utensils,
@@ -35,15 +35,18 @@ export const CustomerOrderPage: React.FC = () => {
     tables,
     orders,
     addItemToOrder,
+    queueCustomerOrder,
     settings,
     language,
   } = usePOS();
 
+  const [initNow] = useState(() => Date.now());
+
   // Extract URL Parameters
-  const searchParams = new URLSearchParams(window.location.search);
+  const searchParams = useMemo(() => new URLSearchParams(window.location.search), []);
   const tableParam = searchParams.get('table') || 't-2';
   const tableCodeParam = searchParams.get('code') || 'A2';
-  const tsParam = searchParams.get('ts') || Date.now().toString();
+  const tsParam = searchParams.get('ts') || initNow.toString();
 
   // Active Navigation Tab: 'menu' | 'cart' | 'status'
   const [activeCustomerTab, setActiveCustomerTab] = useState<'menu' | 'cart' | 'status'>('menu');
@@ -58,8 +61,8 @@ export const CustomerOrderPage: React.FC = () => {
   const [showOrderSuccess, setShowOrderSuccess] = useState(false);
 
   // 1. Session Expiry Check (3 hours = 10,800,000 ms)
-  const sessionTimestamp = parseInt(tsParam, 10) || Date.now();
-  const sessionAgeMs = Date.now() - sessionTimestamp;
+  const sessionTimestamp = useMemo(() => parseInt(tsParam, 10) || initNow, [tsParam, initNow]);
+  const sessionAgeMs = initNow - sessionTimestamp;
   const isSessionExpired = sessionAgeMs > 3 * 60 * 60 * 1000;
 
   // 2. Paid Order Lockout Check
@@ -213,14 +216,30 @@ export const CustomerOrderPage: React.FC = () => {
   const draftSubtotal = draftCart.reduce((sum, c) => sum + c.itemTotal, 0);
   const cartItemCount = draftCart.reduce((sum, c) => sum + c.quantity, 0);
 
-  // Submit Customer Order to POS & Kitchen Display
-  const handleConfirmOrderToKitchen = () => {
+  // Submit Customer Order to Queue Worker for POS & Kitchen Display
+  const handleConfirmOrderToKitchen = async () => {
     if (draftCart.length === 0) return;
 
-    // Dispatch all items to POSContext specifically for this tableId
-    draftCart.forEach((draft) => {
-      addItemToOrder(draft.menuItem, draft.modifiers, draft.instructions, draft.quantity, tableId);
-    });
+    // Dispatch all items to Background Order Queue Worker
+    try {
+      await queueCustomerOrder({
+        tableId,
+        tableName: tableObj ? tableObj.number : tableCodeParam,
+        guestCount: tableObj?.guestCount || 2,
+        items: draftCart.map((d) => ({
+          menuItem: d.menuItem,
+          modifiers: d.modifiers,
+          instructions: d.instructions,
+          quantity: d.quantity,
+        })),
+        guestNote: instructions || undefined,
+      });
+    } catch {
+      // Fallback direct dispatch if worker fails
+      draftCart.forEach((draft) => {
+        addItemToOrder(draft.menuItem, draft.modifiers, draft.instructions, draft.quantity, tableId);
+      });
+    }
 
     // Clear draft cart & trigger celebration
     setDraftCart([]);
@@ -234,7 +253,7 @@ export const CustomerOrderPage: React.FC = () => {
     setTimeout(() => {
       setShowOrderSuccess(false);
       setActiveCustomerTab('status');
-    }, 2000);
+    }, 1800);
   };
 
   // ---------------------------------------------------------------------------

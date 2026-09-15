@@ -1,13 +1,9 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, Suspense, lazy } from 'react';
 import { POSProvider, usePOS } from './context/POSContext';
 import { POSOrderView } from './components/pos/POSOrderView';
-import { TableLayoutManager } from './components/pos/TableLayoutManager';
 import { PinPadModal } from './components/common/PinPadModal';
 import { PaymentModal } from './components/pos/PaymentModal';
-import { ReceiptPrintModal } from './components/pos/ReceiptPrintModal';
-import { AdminDashboard } from './components/admin/AdminDashboard';
-import { KitchenKDS } from './components/kds/KitchenKDS';
-import { CustomerOrderPage } from './components/pos/CustomerOrderPage';
+import { OrderQueueModal } from './components/pos/OrderQueueModal';
 import {
   LayoutGrid,
   BarChart3,
@@ -20,7 +16,34 @@ import {
   Clock,
   Bot,
   Key,
+  Cpu,
 } from 'lucide-react';
+
+// Code-split secondary views to prioritize POS Master resources first
+const TableLayoutManager = lazy(() =>
+  import('./components/pos/TableLayoutManager').then((m) => ({ default: m.TableLayoutManager }))
+);
+const AdminDashboard = lazy(() =>
+  import('./components/admin/AdminDashboard').then((m) => ({ default: m.AdminDashboard }))
+);
+const KitchenKDS = lazy(() =>
+  import('./components/kds/KitchenKDS').then((m) => ({ default: m.KitchenKDS }))
+);
+const CustomerOrderPage = lazy(() =>
+  import('./components/pos/CustomerOrderPage').then((m) => ({ default: m.CustomerOrderPage }))
+);
+const ReceiptPrintModal = lazy(() =>
+  import('./components/pos/ReceiptPrintModal').then((m) => ({ default: m.ReceiptPrintModal }))
+);
+
+const LazyFallback: React.FC = () => (
+  <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#090d16', color: 'var(--color-primary)' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
+      <div style={{ width: 28, height: 28, border: '3px solid rgba(245, 158, 11, 0.2)', borderTopColor: 'var(--color-primary)', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+      <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-text-secondary)' }}>กำลังโหลดส่วนเสริม...</span>
+    </div>
+  </div>
+);
 
 const POSContent: React.FC = () => {
   const {
@@ -33,20 +56,14 @@ const POSContent: React.FC = () => {
     currentShift,
     adminSubTab,
     setAdminSubTab,
+    orderQueue,
+    workerStatus,
+    lastWorkerNotification,
+    dismissWorkerNotification,
   } = usePOS();
 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
-
-  // Check if URL is Customer Mobile Self-Ordering route (/order, /customer-order, or ?table=)
-  const isCustomerRoute =
-    window.location.pathname.startsWith('/order') ||
-    window.location.pathname.startsWith('/customer-order') ||
-    window.location.search.includes('table=');
-
-  if (isCustomerRoute) {
-    return <CustomerOrderPage />;
-  }
 
   // Close menu when clicking outside
   useEffect(() => {
@@ -60,6 +77,20 @@ const POSContent: React.FC = () => {
     }
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [isMenuOpen]);
+
+  // Check if URL is Customer Mobile Self-Ordering route (/order, /customer-order, or ?table=)
+  const isCustomerRoute =
+    window.location.pathname.startsWith('/order') ||
+    window.location.pathname.startsWith('/customer-order') ||
+    window.location.search.includes('table=');
+
+  if (isCustomerRoute) {
+    return (
+      <Suspense fallback={<LazyFallback />}>
+        <CustomerOrderPage />
+      </Suspense>
+    );
+  }
 
   const handleTabClick = (tab: any) => {
     setActiveTab(tab);
@@ -376,6 +407,45 @@ const POSContent: React.FC = () => {
 
         {/* Right: Quick Shift Status + Staff Badge */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+          {/* Background Order Queue Worker Indicator */}
+          <button
+            onClick={() => setActiveModal('order_queue')}
+            title="คลิกเพื่อดูสถานะคิวออเดอร์ลูกค้าและประวัติ Background Worker"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              background: workerStatus === 'processing' ? 'rgba(245, 158, 11, 0.15)' : 'rgba(16, 185, 129, 0.12)',
+              border: `1px solid ${workerStatus === 'processing' ? 'rgba(245, 158, 11, 0.4)' : 'rgba(16, 185, 129, 0.35)'}`,
+              borderRadius: 20,
+              padding: '5px 12px',
+              cursor: 'pointer',
+              color: workerStatus === 'processing' ? '#fbbf24' : '#34d399',
+              fontSize: 12,
+              fontWeight: 700,
+              transition: 'all 0.15s',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            <span
+              style={{
+                width: 7,
+                height: 7,
+                borderRadius: '50%',
+                background: workerStatus === 'processing' ? '#f59e0b' : '#10b981',
+                boxShadow: `0 0 6px ${workerStatus === 'processing' ? '#f59e0b' : '#10b981'}`,
+              }}
+            />
+            <Cpu size={13} style={{ flexShrink: 0 }} />
+            <span className="quick-shift-text">
+              {workerStatus === 'processing'
+                ? 'Worker: กำลังลงบิล...'
+                : orderQueue.filter((q) => q.status === 'queued').length > 0
+                ? `คิวลูกค้า: ${orderQueue.filter((q) => q.status === 'queued').length}`
+                : 'Worker: ปกติ'}
+            </span>
+          </button>
+
           <button
             onClick={() => {
               setAdminSubTab('shifts');
@@ -455,13 +525,94 @@ const POSContent: React.FC = () => {
         </div>
       </header>
 
-      {/* Main View Area - Takes remaining height */}
+      {/* Main View Area - Takes remaining height with Suspense for secondary modules */}
       <main style={{ flex: 1, display: 'flex', overflow: 'hidden', position: 'relative' }}>
         {activeTab === 'pos' && <POSOrderView />}
-        {activeTab === 'tables' && <TableLayoutManager />}
-        {activeTab === 'kds' && <KitchenKDS />}
-        {activeTab === 'admin' && <AdminDashboard />}
+        {activeTab === 'tables' && (
+          <Suspense fallback={<LazyFallback />}>
+            <TableLayoutManager />
+          </Suspense>
+        )}
+        {activeTab === 'kds' && (
+          <Suspense fallback={<LazyFallback />}>
+            <KitchenKDS />
+          </Suspense>
+        )}
+        {activeTab === 'admin' && (
+          <Suspense fallback={<LazyFallback />}>
+            <AdminDashboard />
+          </Suspense>
+        )}
       </main>
+
+      {/* Real-time Cashier Toast for Customer Self-Orders via Queue Worker */}
+      {lastWorkerNotification && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 56,
+            right: 16,
+            zIndex: 9999,
+            background: 'rgba(17, 24, 39, 0.96)',
+            backdropFilter: 'blur(16px)',
+            border: '1px solid rgba(245, 158, 11, 0.4)',
+            boxShadow: '0 12px 32px rgba(0, 0, 0, 0.5)',
+            borderRadius: 12,
+            padding: '12px 16px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 12,
+          }}
+        >
+          <div
+            style={{
+              width: 36,
+              height: 36,
+              borderRadius: 8,
+              background: 'rgba(245, 158, 11, 0.2)',
+              border: '1px solid rgba(245, 158, 11, 0.4)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: 'var(--color-primary)',
+            }}
+          >
+            <Flame size={20} />
+          </div>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 800, color: '#fff' }}>
+              🔔 ลูกค้าโต๊ะ {lastWorkerNotification.tableName} สั่งอาหาร ({lastWorkerNotification.itemCount} รายการ)
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginTop: 2 }}>
+              Worker ประมวลผลและส่งเข้าครัวเรียบร้อยแล้ว • {lastWorkerNotification.time}
+            </div>
+          </div>
+          <button
+            onClick={() => {
+              dismissWorkerNotification();
+              setActiveModal('order_queue');
+            }}
+            style={{
+              background: 'rgba(245, 158, 11, 0.2)',
+              border: '1px solid rgba(245, 158, 11, 0.4)',
+              color: 'var(--color-primary)',
+              padding: '6px 12px',
+              borderRadius: 6,
+              fontSize: 12,
+              fontWeight: 700,
+              cursor: 'pointer',
+            }}
+          >
+            ดูคิว
+          </button>
+          <button
+            onClick={dismissWorkerNotification}
+            style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: 4 }}
+          >
+            <CloseIcon size={16} />
+          </button>
+        </div>
+      )}
 
       {/* Modals */}
       <PinPadModal
@@ -474,8 +625,15 @@ const POSContent: React.FC = () => {
         onClose={() => setActiveModal(null)}
       />
 
-      <ReceiptPrintModal
-        isOpen={activeModal === 'receipt'}
+      <Suspense fallback={null}>
+        <ReceiptPrintModal
+          isOpen={activeModal === 'receipt'}
+          onClose={() => setActiveModal(null)}
+        />
+      </Suspense>
+
+      <OrderQueueModal
+        isOpen={activeModal === 'order_queue'}
         onClose={() => setActiveModal(null)}
       />
     </div>

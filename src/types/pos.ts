@@ -348,3 +348,23 @@ export interface RestaurantSettings {
   paymentChannels?: PaymentChannelsSettings;
 }
 
+export interface QueuedCustomerOrderItem {
+  menuItem: MenuItem;
+  modifiers: SelectedModifier[];
+  instructions?: string;
+  quantity: number;
+}
+
+export interface QueuedCustomerOrder {
+  id: string;
+  tableId: string;
+  tableName: string;
+  guestCount?: number;
+  items: QueuedCustomerOrderItem[];
+  guestNote?: string;
+  submittedAt: string;
+  status: 'queued' | 'processing' | 'completed' | 'failed';
+  processedAt?: string;
+  error?: string;
+}
+

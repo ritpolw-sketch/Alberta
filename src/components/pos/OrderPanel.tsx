@@ -202,9 +202,10 @@ export const OrderPanel: React.FC<OrderPanelProps> = ({ hideMenuToggle = false }
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          {activeTable && (
+          {activeOrder && items.length > 0 && (
             <button
-              onClick={() => setIsQRModalOpen(true)}
+              onClick={handleDirectPrintReceipt}
+              className="btn-secondary"
               style={{
                 padding: '6px 10px',
                 display: 'flex',
@@ -212,70 +213,13 @@ export const OrderPanel: React.FC<OrderPanelProps> = ({ hideMenuToggle = false }
                 gap: 5,
                 fontSize: 12,
                 fontWeight: 700,
-                background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.2), rgba(217, 119, 6, 0.1))',
-                border: '1px solid rgba(245, 158, 11, 0.4)',
-                color: 'var(--color-primary)',
-                borderRadius: 6,
-                cursor: 'pointer',
-                transition: 'all 0.15s ease',
                 flexShrink: 0,
               }}
-              title={language === 'th' ? 'พิมพ์ QR Code สั่งอาหารให้ลูกค้าสแกนสั่งเอง' : 'Print Customer Order QR'}
+              title={language === 'th' ? 'พิมพ์ใบเรียกเก็บเงินทันที (ไม่มี Modal)' : 'Print bill directly'}
             >
-              <QrCode size={14} />
-              <span>{language === 'th' ? 'QR สั่งอาหาร' : 'Order QR'}</span>
+              <Printer size={15} />
+              <span>{language === 'th' ? 'พิมพ์บิล' : 'Print'}</span>
             </button>
-          )}
-
-          {activeOrder && items.length > 0 && (
-            <>
-              <button
-                onClick={() => setIsClearModalOpen(true)}
-                style={{
-                  padding: '6px 10px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 5,
-                  fontSize: 12,
-                  fontWeight: 700,
-                  background: 'rgba(239, 68, 68, 0.12)',
-                  border: '1px solid rgba(239, 68, 68, 0.3)',
-                  color: '#f87171',
-                  borderRadius: 6,
-                  cursor: 'pointer',
-                  transition: 'all 0.15s ease',
-                  flexShrink: 0,
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = 'rgba(239, 68, 68, 0.25)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = 'rgba(239, 68, 68, 0.12)';
-                }}
-                title={language === 'th' ? 'ล้างรายการอาหารทั้งหมดในบิล (Reset)' : 'Clear all items in bill'}
-              >
-                <Trash2 size={14} />
-                <span>{language === 'th' ? 'ล้างบิล' : 'Clear'}</span>
-              </button>
-
-              <button
-                onClick={handleDirectPrintReceipt}
-                className="btn-secondary"
-                style={{
-                  padding: '6px 10px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 5,
-                  fontSize: 12,
-                  fontWeight: 700,
-                  flexShrink: 0,
-                }}
-                title={language === 'th' ? 'พิมพ์ใบเรียกเก็บเงินทันที (ไม่มี Modal)' : 'Print bill directly'}
-              >
-                <Printer size={15} />
-                <span>{language === 'th' ? 'พิมพ์บิล' : 'Print'}</span>
-              </button>
-            </>
           )}
 
           {/* Toggle between Menu Catalog & Cart (only when menu is not displayed side-by-side) */}
@@ -540,8 +484,8 @@ export const OrderPanel: React.FC<OrderPanelProps> = ({ hideMenuToggle = false }
             )}
           </div>
 
-          {/* Financial Calculation Summary (Service Charge & VAT hidden when toggled off in Settings) */}
-          {activeOrder && items.length > 0 && (
+          {/* Actions & Financial Calculation Summary */}
+          {activeTable && (
             <div
               style={{
                 background: 'var(--color-bg-elevated)',
@@ -549,14 +493,81 @@ export const OrderPanel: React.FC<OrderPanelProps> = ({ hideMenuToggle = false }
                 padding: '10px 14px',
                 display: 'flex',
                 flexDirection: 'column',
-                gap: 5,
+                gap: 6,
                 flexShrink: 0,
               }}
             >
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--color-text-secondary)' }}>
-                <span>{language === 'th' ? 'ยอดรวมอาหาร (Subtotal)' : 'Subtotal'}</span>
-                <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>฿{activeOrder.subtotal.toLocaleString()}</span>
+              {/* Quick Actions Row: QR สั่งอาหาร & ล้างบิล */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <button
+                  onClick={() => setIsQRModalOpen(true)}
+                  style={{
+                    flex: 1,
+                    padding: '7px 10px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 6,
+                    fontSize: 12,
+                    fontWeight: 700,
+                    background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.2), rgba(217, 119, 6, 0.1))',
+                    border: '1px solid rgba(245, 158, 11, 0.4)',
+                    color: 'var(--color-primary)',
+                    borderRadius: 6,
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = 'linear-gradient(135deg, rgba(245, 158, 11, 0.35), rgba(217, 119, 6, 0.2))';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'linear-gradient(135deg, rgba(245, 158, 11, 0.2), rgba(217, 119, 6, 0.1))';
+                  }}
+                  title={language === 'th' ? 'พิมพ์ QR Code สั่งอาหารให้ลูกค้าสแกนสั่งเอง' : 'Print Customer Order QR'}
+                >
+                  <QrCode size={14} />
+                  <span>{language === 'th' ? 'QR สั่งอาหาร' : 'Order QR'}</span>
+                </button>
+
+                {activeOrder && items.length > 0 && (
+                  <button
+                    onClick={() => setIsClearModalOpen(true)}
+                    style={{
+                      flex: 1,
+                      padding: '7px 10px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 6,
+                      fontSize: 12,
+                      fontWeight: 700,
+                      background: 'rgba(239, 68, 68, 0.12)',
+                      border: '1px solid rgba(239, 68, 68, 0.3)',
+                      color: '#f87171',
+                      borderRadius: 6,
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = 'rgba(239, 68, 68, 0.25)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = 'rgba(239, 68, 68, 0.12)';
+                    }}
+                    title={language === 'th' ? 'ล้างรายการอาหารทั้งหมดในบิล (Reset)' : 'Clear all items in bill'}
+                  >
+                    <Trash2 size={14} />
+                    <span>{language === 'th' ? 'ล้างบิล' : 'Clear'}</span>
+                  </button>
+                )}
               </div>
+
+              {activeOrder && items.length > 0 && (
+                <>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--color-text-secondary)', marginTop: 4, paddingTop: 6, borderTop: '1px dashed var(--color-border)' }}>
+                    <span>{language === 'th' ? 'ยอดรวมอาหาร (Subtotal)' : 'Subtotal'}</span>
+                    <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>฿{activeOrder.subtotal.toLocaleString()}</span>
+                  </div>
 
               {/* Service Charge Line - Only shown if enabled in Settings */}
               {settings.enableServiceCharge && activeOrder.serviceChargeAmount > 0 && (
@@ -613,8 +624,10 @@ export const OrderPanel: React.FC<OrderPanelProps> = ({ hideMenuToggle = false }
                   ฿{activeOrder.grandTotal.toLocaleString()}
                 </span>
               </div>
-            </div>
+            </>
           )}
+        </div>
+      )}
 
           {/* Bottom Actions Bar */}
           <div

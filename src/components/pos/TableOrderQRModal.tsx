@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { usePOS } from '../../context/POSContext';
 import {
   QrCode,
@@ -25,10 +25,14 @@ export const TableOrderQRModal: React.FC<TableOrderQRModalProps> = ({
   const { settings, language } = usePOS();
   const [copied, setCopied] = useState(false);
 
+  const sessionCode = useMemo(() => {
+    if (!table) return '';
+    return `SES-${table.id.toUpperCase()}-2026`;
+  }, [table]);
+
   if (!isOpen || !table) return null;
 
   // Generate Table QR Code URL
-  const sessionCode = `SES-${table.id.toUpperCase()}-${Date.now().toString().slice(-4)}`;
   const orderUrl = `${window.location.origin}/customer-order?table=${encodeURIComponent(
     table.id
   )}&code=${encodeURIComponent(table.number)}&session=${sessionCode}`;
