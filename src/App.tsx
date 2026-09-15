@@ -278,23 +278,23 @@ const POSContent: React.FC = () => {
                   <span>ประวัติบิล (Bill Logs)</span>
                 </button>
 
-                <button
-                  onClick={() => {
-                    setAdminSubTab('procurement');
-                    handleTabClick('admin');
-                  }}
-                  className={`nav-item ${activeTab === 'admin' && adminSubTab === 'procurement' ? 'active' : ''}`}
-                >
-                  <Bot size={16} style={{ color: '#06b6d4' }} />
-                  <span>จัดซื้อ & LINE Agent</span>
-                </button>
-
                 {(currentStaff?.role === 'owner' || currentStaff?.role === 'admin') && (
                   <>
                     <div style={{ height: 1, background: 'var(--color-border)', margin: '4px 0' }} />
                     <div style={{ padding: '4px 8px 2px', fontSize: 10, fontWeight: 800, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                       การจัดการระบบ
                     </div>
+                    <button
+                      onClick={() => {
+                        setAdminSubTab('procurement');
+                        handleTabClick('admin');
+                      }}
+                      className={`nav-item ${activeTab === 'admin' && adminSubTab === 'procurement' ? 'active' : ''}`}
+                    >
+                      <Bot size={16} style={{ color: '#06b6d4' }} />
+                      <span>จัดซื้อ & LINE Agent</span>
+                    </button>
+
                     <button
                       onClick={() => {
                         setAdminSubTab('api_keys');

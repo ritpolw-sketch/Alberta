@@ -36,7 +36,7 @@ import { AccountingApiPanel } from './AccountingApiPanel';
 
 const sidebarTabs: { id: AdminSubTab; icon: React.ReactNode; labelTh: string; labelEn: string; ownerOnly?: boolean }[] = [
   { id: 'dashboard', icon: <TrendingUp size={16} />, labelTh: 'ภาพรวม & ยอดขาย', labelEn: 'Dashboard', ownerOnly: true },
-  { id: 'procurement', icon: <Bot size={16} />, labelTh: 'จัดซื้อ & LINE Agent', labelEn: 'Procurement & LINE Agent' },
+  { id: 'procurement', icon: <Bot size={16} />, labelTh: 'จัดซื้อ & LINE Agent', labelEn: 'Procurement & LINE Agent', ownerOnly: true },
   { id: 'api_keys', icon: <Key size={16} />, labelTh: 'API Key & โปรแกรมบัญชี', labelEn: 'API Keys & Accounting', ownerOnly: true },
   { id: 'shifts', icon: <Clock size={16} />, labelTh: 'จัดการกะ', labelEn: 'Manage Shifts' },
   { id: 'bills', icon: <Receipt size={16} />, labelTh: 'ประวัติบิลทั้งหมด', labelEn: 'Bill Logs' },
@@ -67,7 +67,7 @@ export const AdminDashboard: React.FC = () => {
   // If staff is not owner/admin and is currently on an owner-only tab, switch to 'shifts'
   useEffect(() => {
     const isOwnerOrAdmin = currentStaff?.role === 'owner' || currentStaff?.role === 'admin';
-    const ownerTabs: AdminSubTab[] = ['dashboard', 'employees', 'settings'];
+    const ownerTabs: AdminSubTab[] = ['dashboard', 'employees', 'settings', 'procurement', 'api_keys'];
     if (!isOwnerOrAdmin && ownerTabs.includes(adminSubTab)) {
       setAdminSubTab('shifts');
     }
