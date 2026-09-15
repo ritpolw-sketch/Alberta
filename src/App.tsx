@@ -7,6 +7,7 @@ import { PaymentModal } from './components/pos/PaymentModal';
 import { ReceiptPrintModal } from './components/pos/ReceiptPrintModal';
 import { AdminDashboard } from './components/admin/AdminDashboard';
 import { KitchenKDS } from './components/kds/KitchenKDS';
+import { CustomerOrderPage } from './components/pos/CustomerOrderPage';
 import {
   LayoutGrid,
   BarChart3,
@@ -36,6 +37,16 @@ const POSContent: React.FC = () => {
 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+
+  // Check if URL is Customer Mobile Self-Ordering route (/order, /customer-order, or ?table=)
+  const isCustomerRoute =
+    window.location.pathname.startsWith('/order') ||
+    window.location.pathname.startsWith('/customer-order') ||
+    window.location.search.includes('table=');
+
+  if (isCustomerRoute) {
+    return <CustomerOrderPage />;
+  }
 
   // Close menu when clicking outside
   useEffect(() => {
