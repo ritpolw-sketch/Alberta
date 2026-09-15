@@ -23,9 +23,9 @@ import {
   Trash2,
   Eye,
   EyeOff,
-  Bot,
   Key,
   Printer,
+  Workflow,
 } from 'lucide-react';
 import type { MenuItem, AdminSubTab, RestaurantSettings, CardGatewayType, SinglePrintLayoutConfig } from '../../types/pos';
 import { initialSettings } from '../../data/initialData';
@@ -38,7 +38,7 @@ import { AccountingApiPanel } from './AccountingApiPanel';
 
 const sidebarTabs: { id: AdminSubTab; icon: React.ReactNode; labelTh: string; labelEn: string; ownerOnly?: boolean }[] = [
   { id: 'dashboard', icon: <TrendingUp size={16} />, labelTh: 'ภาพรวม & ยอดขาย', labelEn: 'Dashboard', ownerOnly: true },
-  { id: 'procurement', icon: <Bot size={16} />, labelTh: 'จัดซื้อ & LINE Agent', labelEn: 'Procurement & LINE Agent', ownerOnly: true },
+  { id: 'procurement', icon: <Workflow size={16} />, labelTh: 'เวิร์กโฟลว์ & จัดซื้อ (Automation)', labelEn: 'Automation Workflows', ownerOnly: true },
   { id: 'api_keys', icon: <Key size={16} />, labelTh: 'API Key & โปรแกรมบัญชี', labelEn: 'API Keys & Accounting', ownerOnly: true },
   { id: 'shifts', icon: <Clock size={16} />, labelTh: 'จัดการกะ', labelEn: 'Manage Shifts' },
   { id: 'bills', icon: <Receipt size={16} />, labelTh: 'ประวัติบิลทั้งหมด', labelEn: 'Bill Logs' },

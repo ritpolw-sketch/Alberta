@@ -1,33 +1,77 @@
 import React, { useState } from 'react';
 import { usePOS } from '../../context/POSContext';
 import {
+  Workflow,
   Bot,
-  Truck,
-  Package,
-  Plus,
-  Send,
+  Calendar,
+  BookOpen,
+  Clock,
+  Shield,
   CheckCircle2,
   AlertTriangle,
-  QrCode,
-  Building2,
-  MessageSquare,
-  ShieldCheck,
+  Play,
+  Plus,
+  Search,
   Trash2,
   Edit2,
-  Sparkles,
   Settings,
-  Lock,
+  ExternalLink,
+  Sparkles,
+  CheckSquare,
+  FileText,
+  Zap,
+  Send,
+  QrCode,
+  Building2,
+  Truck,
+  Package,
+  MessageSquare,
+  ShieldCheck,
+  Flame,
+  Database,
+  Smile,
+  Wrench,
+  Eye,
 } from 'lucide-react';
-import type { PurchaseOrder, Supplier, InventoryItem, POStatus, OrderingChannelMethod, SupplierPaymentTerm } from '../../types/pos';
+import type {
+  PurchaseOrder,
+  Supplier,
+  InventoryItem,
+  POStatus,
+  AutomationWorkflow,
+  WorkflowSchedule,
+  KnowledgeDocument,
+  StaffRole,
+  WorkflowCategory,
+  WorkflowTriggerType,
+  KnowledgeCategory,
+} from '../../types/pos';
 
 export const ProcurementPanel: React.FC = () => {
   const {
+    // Automation Workflows, Schedules & KM
+    workflows,
+    workflowSchedules,
+    knowledgeDocs,
+    toggleWorkflow,
+    addWorkflow,
+    updateWorkflow,
+    deleteWorkflow,
+    runWorkflowNow,
+    toggleSchedule,
+    addSchedule,
+    updateSchedule,
+    deleteSchedule,
+    addKnowledgeDoc,
+    updateKnowledgeDoc,
+    deleteKnowledgeDoc,
+
+    // Existing Procurement & LINE Agent
     suppliers,
     inventory,
     purchaseOrders,
     lineAgentConfig,
     lineLogs,
-    currentStaff,
     addSupplier,
     updateSupplier,
     deleteSupplier,
@@ -43,7 +87,32 @@ export const ProcurementPanel: React.FC = () => {
     language,
   } = usePOS();
 
-  const [activeSubTab, setActiveSubTab] = useState<'pos_agent' | 'suppliers' | 'inventory' | 'settings'>('pos_agent');
+  // Top-level Navigation: 'workflows' | 'scheduling' | 'km'
+  const [topTab, setTopTab] = useState<'workflows' | 'scheduling' | 'km'>('workflows');
+
+  // Procurement sub-view toggle inside workflows
+  const [showProcurementWorkbench, setShowProcurementWorkbench] = useState(false);
+  const [procurementSubTab, setProcurementSubTab] = useState<'pos_agent' | 'suppliers' | 'inventory' | 'settings'>('pos_agent');
+
+  // Workflow filters & modals
+  const [workflowCategoryFilter, setWorkflowCategoryFilter] = useState<string>('all');
+  const [showCreateWorkflowModal, setShowCreateWorkflowModal] = useState(false);
+  const [editingWorkflow, setEditingWorkflow] = useState<AutomationWorkflow | null>(null);
+  const [runningToast, setRunningToast] = useState<{ name: string; time: string } | null>(null);
+
+  // Scheduling modals
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
+  const [editingSchedule, setEditingSchedule] = useState<WorkflowSchedule | null>(null);
+
+  // KM / SOP filters & modals
+  const [kmSearchQuery, setKmSearchQuery] = useState('');
+  const [kmCategoryFilter, setKmCategoryFilter] = useState<string>('all');
+  const [selectedDocForView, setSelectedDocForView] = useState<KnowledgeDocument | null>(null);
+  const [showDocModal, setShowDocModal] = useState(false);
+  const [editingDoc, setEditingDoc] = useState<KnowledgeDocument | null>(null);
+  const [checkedSopItems, setCheckedSopItems] = useState<Record<string, boolean>>({});
+
+  // Procurement form states
   const [selectedPOForPay, setSelectedPOForPay] = useState<PurchaseOrder | null>(null);
   const [showNewPOModal, setShowNewPOModal] = useState(false);
   const [showSupplierModal, setShowSupplierModal] = useState(false);
@@ -51,13 +120,11 @@ export const ProcurementPanel: React.FC = () => {
   const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
   const [editingInventory, setEditingInventory] = useState<InventoryItem | null>(null);
 
-  // New PO Form state
   const [newPoSupplierId, setNewPoSupplierId] = useState(suppliers[0]?.id || '');
   const [newPoItemId, setNewPoItemId] = useState(inventory[0]?.id || '');
   const [newPoQty, setNewPoQty] = useState(10);
   const [newPoUnitPrice, setNewPoUnitPrice] = useState(inventory[0]?.avgCost || 220);
 
-  // Supplier Form state with Workflow Config
   const [supForm, setSupForm] = useState<Omit<Supplier, 'id'>>({
     name: '',
     contactPerson: '',
@@ -80,7 +147,6 @@ export const ProcurementPanel: React.FC = () => {
     },
   });
 
-  // Inventory Form state
   const [invForm, setInvForm] = useState<Omit<InventoryItem, 'id'>>({
     nameTh: '',
     nameEn: '',
@@ -92,725 +158,525 @@ export const ProcurementPanel: React.FC = () => {
     category: 'วัตถุดิบครัว',
   });
 
-  const isOwnerOrAdmin = currentStaff?.role === 'owner' || currentStaff?.role === 'admin';
+  // Workflow Form State
+  const [wfForm, setWfForm] = useState<Omit<AutomationWorkflow, 'id' | 'executionCount'>>({
+    nameTh: '',
+    nameEn: '',
+    category: 'operations',
+    descriptionTh: '',
+    descriptionEn: '',
+    icon: 'Zap',
+    enabled: true,
+    triggerType: 'schedule',
+    triggerCondition: 'ทุกวัน เวลา 08:00 น.',
+    actions: [
+      { id: 'act-1', type: 'line_notify', title: 'แจ้งเตือนผ่าน LINE', description: 'ส่งสรุปข้อมูลเข้ากลุ่มพนักงาน' }
+    ],
+    allowedRoles: ['owner', 'manager'],
+    approverRole: 'manager',
+    scheduleHuman: 'ทุกวัน 08:00 น.',
+    linkedSopId: '',
+  });
 
-  // Helper Labels for Workflow
-  const getChannelLabel = (method?: OrderingChannelMethod) => {
-    switch (method) {
-      case 'line_group':
-        return '💬 LINE Group Chat';
-      case 'line_oa':
-        return '📱 LINE Official Account';
-      case 'phone':
-        return '📞 โทรศัพท์สั่งตรง';
-      case 'email_pdf':
-        return '📧 Email PDF PO';
-      default:
-        return '💬 LINE Group';
+  // Schedule Form State
+  const [schForm, setSchForm] = useState<Omit<WorkflowSchedule, 'id'>>({
+    workflowId: workflows[0]?.id || '',
+    title: '',
+    timeOfDay: '08:00',
+    daysOfWeek: [0, 1, 2, 3, 4, 5, 6],
+    cronExpression: '0 8 * * *',
+    enabled: true,
+    targetAction: '',
+    allowedRoles: ['owner', 'manager'],
+    requireApproval: false,
+    approverRole: 'manager',
+    status: 'active',
+  });
+
+  // KM Form State
+  const [docForm, setDocForm] = useState<Omit<KnowledgeDocument, 'id' | 'updatedAt'>>({
+    titleTh: '',
+    titleEn: '',
+    category: 'operations',
+    summary: '',
+    contentMarkdown: '',
+    tags: [],
+    authorRole: 'manager',
+    version: 'v1.0',
+    linkedWorkflowIds: [],
+    checklists: [
+      { id: 'c-1', text: 'ตรวจเช็คความสะอาดและความเรียบร้อย', required: true }
+    ],
+  });
+
+  const triggerWorkflowWithFeedback = (wf: AutomationWorkflow) => {
+    runWorkflowNow(wf.id);
+    setRunningToast({ name: wf.nameTh, time: new Date().toLocaleTimeString('th-TH') });
+    setTimeout(() => {
+      setRunningToast(null);
+    }, 4000);
+  };
+
+  const getWorkflowIcon = (iconName: string) => {
+    switch (iconName) {
+      case 'Bot': return <Bot size={20} className="text-emerald-400" />;
+      case 'Wallet': return <Zap size={20} className="text-amber-400" />;
+      case 'Flame': return <Flame size={20} className="text-rose-400" />;
+      case 'Database': return <Database size={20} className="text-blue-400" />;
+      case 'Smile': return <Smile size={20} className="text-purple-400" />;
+      case 'Wrench': return <Wrench size={20} className="text-cyan-400" />;
+      default: return <Workflow size={20} className="text-amber-400" />;
     }
   };
 
-  const getPaymentTermLabel = (term?: SupplierPaymentTerm) => {
-    switch (term) {
-      case 'promptpay_cod':
-        return '⚡ PromptPay สแกนจ่าย (COD)';
-      case 'credit_7':
-        return '📅 เครดิต 7 วัน';
-      case 'credit_15':
-        return '📅 เครดิต 15 วัน';
-      case 'credit_30':
-        return '📅 เครดิต 30 วัน';
-      case 'cash_drawer':
-        return '💵 เงินสดลิ้นชัก';
+  const getCategoryBadge = (cat: WorkflowCategory) => {
+    switch (cat) {
+      case 'procurement':
+        return <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">📦 จัดซื้อ & ซัพพลายเออร์</span>;
+      case 'finance':
+        return <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-500/20 text-amber-300 border border-amber-500/30">💰 การเงิน & ปิดกะ</span>;
+      case 'operations':
+        return <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-500/20 text-blue-300 border border-blue-500/30">🍳 งานครัว & ปฏิบัติการ</span>;
+      case 'inventory':
+        return <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">📊 คลังสต็อก</span>;
+      case 'customer':
+        return <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-pink-500/20 text-pink-300 border border-pink-500/30">🌟 ลูกค้า & รีวิว</span>;
       default:
-        return '⚡ PromptPay (COD)';
+        return <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-gray-500/20 text-gray-300">⚙️ ทั่วไป</span>;
     }
   };
 
-  // Status Badge Helper
+  const getRoleBadge = (role: StaffRole) => {
+    switch (role) {
+      case 'owner':
+        return <span key={role} className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30">👑 Owner</span>;
+      case 'admin':
+        return <span key={role} className="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30">🛡️ Admin</span>;
+      case 'manager':
+        return <span key={role} className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-500/20 text-blue-300 border border-blue-500/30">👔 Manager</span>;
+      case 'cashier':
+        return <span key={role} className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">💵 Cashier</span>;
+      case 'kitchen':
+        return <span key={role} className="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/30">🍳 Kitchen</span>;
+    }
+  };
+
   const getStatusBadge = (status: POStatus) => {
     switch (status) {
       case 'draft':
-        return (
-          <span style={{ padding: '3px 8px', borderRadius: 12, background: 'rgba(255, 255, 255, 0.1)', color: '#94a3b8', fontSize: 11, fontWeight: 700 }}>
-            📝 ร่าง PO
-          </span>
-        );
+        return <span className="px-2 py-0.5 rounded text-xs font-semibold bg-gray-500/20 text-gray-400">📝 ร่าง PO</span>;
       case 'sent_line':
-        return (
-          <span style={{ padding: '3px 8px', borderRadius: 12, background: 'rgba(59, 130, 246, 0.15)', color: '#60a5fa', border: '1px solid rgba(59, 130, 246, 0.3)', fontSize: 11, fontWeight: 700 }}>
-            💬 ส่ง LINE แล้ว
-          </span>
-        );
+        return <span className="px-2 py-0.5 rounded text-xs font-semibold bg-blue-500/20 text-blue-400 border border-blue-500/30">💬 ส่ง LINE แล้ว</span>;
       case 'ocr_received':
-        return (
-          <span style={{ padding: '3px 8px', borderRadius: 12, background: 'rgba(245, 158, 11, 0.2)', color: '#fbbf24', border: '1px solid rgba(245, 158, 11, 0.4)', fontSize: 11, fontWeight: 700 }}>
-            🔍 รอตรวจสอบ OCR & QR
-          </span>
-        );
+        return <span className="px-2 py-0.5 rounded text-xs font-semibold bg-amber-500/20 text-amber-400 border border-amber-500/30">🔍 รอตรวจ OCR</span>;
       case 'reconciled':
-        return (
-          <span style={{ padding: '3px 8px', borderRadius: 12, background: 'rgba(16, 185, 129, 0.2)', color: '#34d399', border: '1px solid rgba(16, 185, 129, 0.4)', fontSize: 11, fontWeight: 700 }}>
-            ✨ ตรวจสอบถูกต้อง พร้อมจ่าย
-          </span>
-        );
+        return <span className="px-2 py-0.5 rounded text-xs font-semibold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">✅ ตรวจสอบแล้ว</span>;
       case 'completed':
-        return (
-          <span style={{ padding: '3px 8px', borderRadius: 12, background: 'rgba(16, 185, 129, 0.25)', color: '#10b981', fontSize: 11, fontWeight: 700 }}>
-            ✅ จ่ายแล้ว & เข้าคลังเรียบร้อย
-          </span>
-        );
+        return <span className="px-2 py-0.5 rounded text-xs font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">🎉 จ่ายแล้ว & เข้าสต็อก</span>;
       default:
         return null;
     }
   };
 
-  const handleCreatePO = (e: React.FormEvent) => {
-    e.preventDefault();
-    const invItem = inventory.find((i) => i.id === newPoItemId);
-    const supplier = suppliers.find((s) => s.id === newPoSupplierId);
-    if (!invItem || !supplier) return;
+  const filteredWorkflows = workflows.filter((w) => {
+    if (workflowCategoryFilter !== 'all' && w.category !== workflowCategoryFilter) return false;
+    return true;
+  });
 
-    const total = newPoQty * newPoUnitPrice;
-    createPurchaseOrder({
-      supplierId: supplier.id,
-      supplierName: supplier.name,
-      items: [
-        {
-          inventoryItemId: invItem.id,
-          nameTh: invItem.nameTh,
-          unit: invItem.unit,
-          qtyOrdered: newPoQty,
-          unitPrice: newPoUnitPrice,
-          total,
-        },
-      ],
-      subtotal: total,
-      grandTotal: total,
-    });
-
-    setShowNewPOModal(false);
-  };
-
-  const handleSaveSupplier = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (editingSupplier) {
-      updateSupplier({ ...supForm, id: editingSupplier.id });
-    } else {
-      addSupplier(supForm);
+  const filteredKnowledgeDocs = knowledgeDocs.filter((doc) => {
+    if (kmCategoryFilter !== 'all' && doc.category !== kmCategoryFilter) return false;
+    if (kmSearchQuery.trim()) {
+      const q = kmSearchQuery.toLowerCase();
+      const matchTitle = doc.titleTh.toLowerCase().includes(q) || doc.titleEn.toLowerCase().includes(q);
+      const matchSummary = doc.summary.toLowerCase().includes(q);
+      const matchTags = doc.tags.some((t) => t.toLowerCase().includes(q));
+      return matchTitle || matchSummary || matchTags;
     }
-    setShowSupplierModal(false);
-    setEditingSupplier(null);
-  };
-
-  const handleSaveInventory = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (editingInventory) {
-      updateInventoryItem({ ...invForm, id: editingInventory.id });
-    } else {
-      addInventoryItem(invForm);
-    }
-    setShowInventoryModal(false);
-    setEditingInventory(null);
-  };
+    return true;
+  });
 
   return (
-    <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 20, color: '#fff' }}>
-      {/* Top Banner & Title */}
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          background: 'linear-gradient(135deg, rgba(30, 41, 59, 0.9), rgba(15, 23, 42, 0.95))',
-          padding: '16px 20px',
-          borderRadius: 14,
-          border: '1px solid var(--color-border)',
-          backdropFilter: 'blur(12px)',
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-          <div
-            style={{
-              width: 44,
-              height: 44,
-              borderRadius: 12,
-              background: 'linear-gradient(135deg, #06b6d4, #3b82f6)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#fff',
-              boxShadow: '0 4px 12px rgba(6, 182, 212, 0.3)',
-            }}
-          >
-            <Bot size={24} />
-          </div>
+    <div className="space-y-6">
+      {/* Toast feedback when workflow runs */}
+      {runningToast && (
+        <div className="fixed top-6 right-6 z-50 bg-emerald-950/90 border border-emerald-500/50 text-emerald-100 px-4 py-3 rounded-xl shadow-2xl flex items-center gap-3 animate-bounce">
+          <Sparkles size={20} className="text-emerald-400 animate-spin" />
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <h2 style={{ fontSize: 18, fontWeight: 800, margin: 0 }}>
-                {language === 'th' ? 'การจัดซื้อ & บอทจัดซื้อ LINE Agent' : 'Procurement & LINE Agent'}
-              </h2>
-              <span
-                style={{
-                  fontSize: 11,
-                  padding: '2px 8px',
-                  borderRadius: 10,
-                  background: lineAgentConfig.botEnabled ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)',
-                  color: lineAgentConfig.botEnabled ? '#34d399' : '#f87171',
-                  fontWeight: 700,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 4,
-                }}
-              >
-                <span style={{ width: 6, height: 6, borderRadius: '50%', background: lineAgentConfig.botEnabled ? '#10b981' : '#ef4444' }} />
-                {lineAgentConfig.botEnabled ? 'Agent Active' : 'Agent Paused'}
-              </span>
-            </div>
-            <p style={{ fontSize: 12, color: 'var(--color-text-secondary)', margin: '2px 0 0' }}>
-              ตั้งค่า Procurement Workflow รายซัพพลายเออร์, สั่งซื้ออัตโนมัติผ่าน LINE Group/OA, OCR บิล และสแกนจ่าย PromptPay
-            </p>
-          </div>
-        </div>
-
-        {/* Quick Action Button */}
-        <div style={{ display: 'flex', gap: 10 }}>
-          <button
-            onClick={() => setShowNewPOModal(true)}
-            className="btn-primary"
-            style={{
-              padding: '8px 16px',
-              borderRadius: 8,
-              fontSize: 13,
-              fontWeight: 700,
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6,
-            }}
-          >
-            <Plus size={16} />
-            <span>สร้างใบสั่งซื้อ (PO)</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Sub Tabs */}
-      <div style={{ display: 'flex', gap: 8, borderBottom: '1px solid var(--color-border)', paddingBottom: 10 }}>
-        <button
-          onClick={() => setActiveSubTab('pos_agent')}
-          style={{
-            padding: '8px 16px',
-            borderRadius: 8,
-            border: 'none',
-            background: activeSubTab === 'pos_agent' ? 'rgba(6, 182, 212, 0.15)' : 'transparent',
-            color: activeSubTab === 'pos_agent' ? '#22d3ee' : 'var(--color-text-secondary)',
-            fontSize: 13,
-            fontWeight: 700,
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 6,
-          }}
-        >
-          <MessageSquare size={15} />
-          <span>ใบสั่งซื้อ & LINE Agent ({purchaseOrders.length})</span>
-        </button>
-
-        <button
-          onClick={() => setActiveSubTab('suppliers')}
-          style={{
-            padding: '8px 16px',
-            borderRadius: 8,
-            border: 'none',
-            background: activeSubTab === 'suppliers' ? 'rgba(6, 182, 212, 0.15)' : 'transparent',
-            color: activeSubTab === 'suppliers' ? '#22d3ee' : 'var(--color-text-secondary)',
-            fontSize: 13,
-            fontWeight: 700,
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 6,
-          }}
-        >
-          <Truck size={15} />
-          <span>ซัพพลายเออร์ & Workflow ({suppliers.length})</span>
-        </button>
-
-        <button
-          onClick={() => setActiveSubTab('inventory')}
-          style={{
-            padding: '8px 16px',
-            borderRadius: 8,
-            border: 'none',
-            background: activeSubTab === 'inventory' ? 'rgba(6, 182, 212, 0.15)' : 'transparent',
-            color: activeSubTab === 'inventory' ? '#22d3ee' : 'var(--color-text-secondary)',
-            fontSize: 13,
-            fontWeight: 700,
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 6,
-          }}
-        >
-          <Package size={15} />
-          <span>คลังวัตถุดิบ ({inventory.length})</span>
-        </button>
-
-        <button
-          onClick={() => setActiveSubTab('settings')}
-          style={{
-            padding: '8px 16px',
-            borderRadius: 8,
-            border: 'none',
-            background: activeSubTab === 'settings' ? 'rgba(6, 182, 212, 0.15)' : 'transparent',
-            color: activeSubTab === 'settings' ? '#22d3ee' : 'var(--color-text-secondary)',
-            fontSize: 13,
-            fontWeight: 700,
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 6,
-          }}
-        >
-          <ShieldCheck size={15} />
-          <span>ตั้งค่า Agent & RBAC</span>
-        </button>
-      </div>
-
-      {/* TAB 1: LINE Agent & POs */}
-      {activeSubTab === 'pos_agent' && (
-        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 20 }}>
-          {/* Left Column: Purchase Orders */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-            <h3 style={{ fontSize: 15, fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span>รายการใบสั่งซื้อ (Purchase Orders)</span>
-            </h3>
-
-            {purchaseOrders.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: 40, background: 'var(--color-bg-card)', borderRadius: 12, color: 'var(--color-text-muted)' }}>
-                ไม่มีใบสั่งซื้อในขณะนี้
-              </div>
-            ) : (
-              purchaseOrders.map((po) => {
-                const supplier = suppliers.find((s) => s.id === po.supplierId);
-                const wf = supplier?.workflowConfig;
-                const threshold = wf?.autoApproveThreshold ?? lineAgentConfig.autoApprovalThreshold;
-                const requiresOwner = wf?.requireOwnerApproval || po.grandTotal > threshold;
-                const isNeedOwnerApprove = requiresOwner && !isOwnerOrAdmin;
-
-                return (
-                  <div
-                    key={po.id}
-                    style={{
-                      background: 'var(--color-bg-card)',
-                      border: '1px solid var(--color-border)',
-                      borderRadius: 12,
-                      padding: 16,
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: 12,
-                    }}
-                  >
-                    {/* Header */}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <span style={{ fontSize: 15, fontWeight: 800, color: 'var(--color-primary)' }}>{po.poNumber}</span>
-                        {getStatusBadge(po.status)}
-                      </div>
-                      <span style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>
-                        สร้างเมื่อ {new Date(po.createdAt).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })} โดย {po.createdBy}
-                      </span>
-                    </div>
-
-                    {/* Supplier Info & Per-Supplier Workflow Badges */}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 700, color: '#e2e8f0' }}>
-                        <Building2 size={15} style={{ color: '#06b6d4' }} />
-                        <span>{po.supplierName}</span>
-                      </div>
-                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                        <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 8, background: 'rgba(6, 182, 212, 0.15)', color: '#22d3ee', fontWeight: 700 }}>
-                          {getChannelLabel(wf?.channelMethod)}
-                        </span>
-                        <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 8, background: 'rgba(168, 85, 247, 0.15)', color: '#c084fc', fontWeight: 700 }}>
-                          {getPaymentTermLabel(wf?.paymentTerm)}
-                        </span>
-                        {requiresOwner && (
-                          <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 8, background: 'rgba(239, 68, 68, 0.15)', color: '#f87171', fontWeight: 700 }}>
-                            🔒 ต้องมี Owner PIN
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Items Table */}
-                    <div style={{ background: 'rgba(15, 23, 42, 0.5)', borderRadius: 8, padding: 10, border: '1px solid rgba(255, 255, 255, 0.05)' }}>
-                      {po.items.map((it, idx) => (
-                        <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '3px 0' }}>
-                          <span>
-                            {it.nameTh} ({it.qtyOrdered} {it.unit} @ ฿{it.unitPrice})
-                          </span>
-                          <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700 }}>฿{it.total.toLocaleString()}</span>
-                        </div>
-                      ))}
-                      <div
-                        style={{
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          borderTop: '1px dashed var(--color-border)',
-                          marginTop: 6,
-                          paddingTop: 6,
-                          fontSize: 13,
-                          fontWeight: 800,
-                        }}
-                      >
-                        <span>ยอดรวมทั้งสิ้น (Grand Total)</span>
-                        <span style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-mono)' }}>฿{po.grandTotal.toLocaleString()}</span>
-                      </div>
-                    </div>
-
-                    {/* Special Supplier Instructions */}
-                    {wf?.specialInstructions && (
-                      <div style={{ fontSize: 11, color: '#fbbf24', fontStyle: 'italic', background: 'rgba(245, 158, 11, 0.1)', padding: '4px 8px', borderRadius: 6 }}>
-                        📌 คำแนะนำพิเศษซัพพลายเออร์: "{wf.specialInstructions}"
-                      </div>
-                    )}
-
-                    {/* Discrepancy Alert */}
-                    {po.discrepancyAmount !== undefined && po.discrepancyAmount !== 0 && (
-                      <div
-                        style={{
-                          padding: '8px 12px',
-                          borderRadius: 8,
-                          background: 'rgba(245, 158, 11, 0.15)',
-                          border: '1px solid rgba(245, 158, 11, 0.4)',
-                          color: '#fbbf24',
-                          fontSize: 12,
-                          fontWeight: 600,
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 8,
-                        }}
-                      >
-                        <AlertTriangle size={16} />
-                        <span>
-                          บิล OCR ที่รับเข้ามียอดต่างจาก PO: ฿{po.ocrExtractedTotal?.toLocaleString()} (ส่วนต่าง +฿
-                          {po.discrepancyAmount.toLocaleString()})
-                        </span>
-                      </div>
-                    )}
-
-                    {/* Actions Bar */}
-                    <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', paddingTop: 6, borderTop: '1px solid rgba(255, 255, 255, 0.05)' }}>
-                      {po.status === 'draft' && (
-                        <button
-                          onClick={() => sendPOToLineGroup(po.id)}
-                          disabled={isNeedOwnerApprove}
-                          className="btn-primary"
-                          style={{
-                            padding: '6px 14px',
-                            borderRadius: 6,
-                            fontSize: 12,
-                            fontWeight: 700,
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 6,
-                            background: isNeedOwnerApprove ? 'gray' : undefined,
-                          }}
-                        >
-                          <Send size={14} />
-                          <span>{isNeedOwnerApprove ? `รอ Owner อนุมัติ (เกิน ฿${threshold.toLocaleString()})` : `ส่งผ่าน ${getChannelLabel(wf?.channelMethod)}`}</span>
-                        </button>
-                      )}
-
-                      {po.status === 'sent_line' && (
-                        <div style={{ display: 'flex', gap: 6 }}>
-                          <button
-                            onClick={() => simulateSupplierLineReply(po.id, po.grandTotal, false)}
-                            style={{
-                              padding: '6px 12px',
-                              borderRadius: 6,
-                              background: 'rgba(16, 185, 129, 0.15)',
-                              border: '1px solid rgba(16, 185, 129, 0.4)',
-                              color: '#34d399',
-                              fontSize: 12,
-                              fontWeight: 700,
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: 5,
-                            }}
-                          >
-                            <Sparkles size={14} />
-                            <span>จำลองตอบรับ (ตรงเป๊ะ)</span>
-                          </button>
-                          <button
-                            onClick={() => simulateSupplierLineReply(po.id, po.grandTotal + 300, true)}
-                            style={{
-                              padding: '6px 12px',
-                              borderRadius: 6,
-                              background: 'rgba(245, 158, 11, 0.15)',
-                              border: '1px solid rgba(245, 158, 11, 0.4)',
-                              color: '#fbbf24',
-                              fontSize: 12,
-                              fontWeight: 700,
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: 5,
-                            }}
-                          >
-                            <AlertTriangle size={14} />
-                            <span>จำลองตอบรับ (+฿300)</span>
-                          </button>
-                        </div>
-                      )}
-
-                      {(po.status === 'ocr_received' || po.status === 'reconciled') && po.paymentStatus === 'pending' && (
-                        <button
-                          onClick={() => setSelectedPOForPay(po)}
-                          className="btn-primary"
-                          style={{
-                            padding: '6px 14px',
-                            borderRadius: 6,
-                            fontSize: 12,
-                            fontWeight: 700,
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 6,
-                            background: 'linear-gradient(135deg, #10b981, #059669)',
-                          }}
-                        >
-                          <QrCode size={14} />
-                          <span>1-Click สแกนจ่าย PromptPay & ตัดสต็อกเข้าคลัง</span>
-                        </button>
-                      )}
-
-                      {po.status === 'completed' && (
-                        <div style={{ fontSize: 12, color: '#34d399', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 5 }}>
-                          <CheckCircle2 size={16} />
-                          <span>ชำระเรียบร้อย & ตัดสต็อกเข้าคลังแล้ว</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })
-            )}
-          </div>
-
-          {/* Right Column: Live LINE Chat & Agent Logs */}
-          <div
-            style={{
-              background: 'var(--color-bg-card)',
-              border: '1px solid var(--color-border)',
-              borderRadius: 14,
-              padding: 16,
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 12,
-              maxHeight: 700,
-              overflow: 'hidden',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--color-border)', paddingBottom: 10 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <MessageSquare size={16} style={{ color: '#06b6d4' }} />
-                <span style={{ fontSize: 14, fontWeight: 800 }}>ประวัติแชท LINE Group</span>
-              </div>
-              <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 10, background: 'rgba(6, 182, 212, 0.2)', color: '#22d3ee', fontWeight: 700 }}>
-                Live Feed
-              </span>
-            </div>
-
-            <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 10, paddingRight: 4 }}>
-              {lineLogs.map((log) => (
-                <div
-                  key={log.id}
-                  style={{
-                    alignSelf: log.direction === 'outbound' ? 'flex-end' : 'flex-start',
-                    maxWidth: '88%',
-                    background: log.direction === 'outbound' ? 'rgba(6, 182, 212, 0.15)' : 'rgba(255, 255, 255, 0.05)',
-                    border: log.direction === 'outbound' ? '1px solid rgba(6, 182, 212, 0.3)' : '1px solid var(--color-border)',
-                    borderRadius: 10,
-                    padding: 10,
-                    fontSize: 12,
-                  }}
-                >
-                  <div style={{ fontSize: 10, fontWeight: 800, color: log.direction === 'outbound' ? '#22d3ee' : '#94a3b8', marginBottom: 4 }}>
-                    {log.sender} • {new Date(log.timestamp).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })}
-                  </div>
-                  <div style={{ whiteSpace: 'pre-wrap', lineHeight: 1.4 }}>{log.messageText}</div>
-
-                  {log.imageUrl && (
-                    <div style={{ marginTop: 8, borderRadius: 6, overflow: 'hidden', border: '1px solid rgba(255, 255, 255, 0.1)' }}>
-                      <img src={log.imageUrl} alt="LINE Receipt" style={{ width: '100%', height: 120, objectFit: 'cover' }} />
-                      <div style={{ background: 'rgba(0,0,0,0.7)', padding: '4px 8px', fontSize: 10, color: '#34d399', fontWeight: 700 }}>
-                        🔍 OCR Detected: PromptPay QR Code Payload Ready
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
+            <div className="font-bold text-sm">สั่งรันเวิร์กโฟลว์สำเร็จ!</div>
+            <div className="text-xs text-emerald-300">{runningToast.name} ({runningToast.time})</div>
           </div>
         </div>
       )}
 
-      {/* TAB 2: SUPPLIERS & WORKFLOW SETUP */}
-      {activeSubTab === 'suppliers' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div>
-              <h3 style={{ fontSize: 15, fontWeight: 700, margin: 0 }}>ซัพพลายเออร์ & Procurement Workflow Configuration</h3>
-              <p style={{ fontSize: 12, color: 'var(--color-text-secondary)', margin: '2px 0 0' }}>
-                กำหนดช่องทางสั่งซื้อ, เงื่อนไขชำระเงิน, วงเงินอนุมัติ และคำสั่งเฉพาะรายซัพพลายเออร์
-              </p>
+      {/* Header Banner & Title */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-gradient-to-r from-amber-950/40 via-purple-950/30 to-blue-950/40 border border-amber-500/20 p-6 rounded-2xl">
+        <div className="flex items-center gap-4">
+          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-500 to-amber-600 flex items-center justify-center shadow-lg shadow-amber-500/20">
+            <Workflow size={28} className="text-black" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl font-black text-white tracking-tight">
+                {language === 'th' ? 'ศูนย์จัดการเวิร์กโฟลว์อัตโนมัติ (Automation Workflow Hub)' : 'Automation Workflow & Procurement Center'}
+              </h1>
+              <span className="px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30 text-xs font-bold">
+                PRO Enterprise
+              </span>
             </div>
+            <p className="text-sm text-gray-400 mt-0.5">
+              {language === 'th'
+                ? 'ระบบจัดการการทำงานอัตโนมัติทั้งร้าน • ระบบจัดซื้อ & LINE Bot • RBAC Scheduling • คลังความรู้ KM & SOP'
+                : 'Modular Restaurant Automation • Autonomous LINE Procurement • RBAC Scheduling • SOP Knowledge Base'}
+            </p>
+          </div>
+        </div>
+
+        {/* Global Action Stats */}
+        <div className="flex items-center gap-3">
+          <div className="bg-white/5 border border-white/10 px-4 py-2 rounded-xl text-center">
+            <div className="text-xs text-gray-400">เวิร์กโฟลว์ทั้งหมด</div>
+            <div className="text-lg font-black text-amber-400">{workflows.length}</div>
+          </div>
+          <div className="bg-white/5 border border-white/10 px-4 py-2 rounded-xl text-center">
+            <div className="text-xs text-gray-400">ตารางเวลา RBAC</div>
+            <div className="text-lg font-black text-blue-400">{workflowSchedules.length}</div>
+          </div>
+          <div className="bg-white/5 border border-white/10 px-4 py-2 rounded-xl text-center">
+            <div className="text-xs text-gray-400">คลังเอกสาร SOP</div>
+            <div className="text-lg font-black text-emerald-400">{knowledgeDocs.length}</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Main 3 Navigation Tabs */}
+      <div className="flex border-b border-white/10 gap-2 overflow-x-auto pb-1">
+        <button
+          onClick={() => { setTopTab('workflows'); setShowProcurementWorkbench(false); }}
+          className={`flex items-center gap-2.5 px-5 py-3 rounded-xl font-bold text-sm transition-all ${
+            topTab === 'workflows' && !showProcurementWorkbench
+              ? 'bg-amber-500 text-black shadow-lg shadow-amber-500/20'
+              : 'text-gray-400 hover:text-white hover:bg-white/5'
+          }`}
+        >
+          <Zap size={18} />
+          <span>⚡ เวิร์กโฟลว์ทั้งหมด (Workflows)</span>
+          <span className="px-2 py-0.5 rounded-full text-xs bg-black/20 font-bold">{workflows.length}</span>
+        </button>
+
+        <button
+          onClick={() => { setTopTab('scheduling'); setShowProcurementWorkbench(false); }}
+          className={`flex items-center gap-2.5 px-5 py-3 rounded-xl font-bold text-sm transition-all ${
+            topTab === 'scheduling'
+              ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/20'
+              : 'text-gray-400 hover:text-white hover:bg-white/5'
+          }`}
+        >
+          <Clock size={18} />
+          <span>⏱️ ตารางเวลา & สิทธิ์ RBAC (Scheduling)</span>
+          <span className="px-2 py-0.5 rounded-full text-xs bg-black/20 font-bold">{workflowSchedules.length}</span>
+        </button>
+
+        <button
+          onClick={() => { setTopTab('km'); setShowProcurementWorkbench(false); }}
+          className={`flex items-center gap-2.5 px-5 py-3 rounded-xl font-bold text-sm transition-all ${
+            topTab === 'km'
+              ? 'bg-emerald-500 text-black shadow-lg shadow-emerald-500/20'
+              : 'text-gray-400 hover:text-white hover:bg-white/5'
+          }`}
+        >
+          <BookOpen size={18} />
+          <span>📚 คลังความรู้ & SOP (Knowledge Base - KM)</span>
+          <span className="px-2 py-0.5 rounded-full text-xs bg-black/20 font-bold">{knowledgeDocs.length}</span>
+        </button>
+      </div>
+
+      {/* ========================================================================= */}
+      {/* TAB 1: WORKFLOW CATALOG & PROCUREMENT */}
+      {/* ========================================================================= */}
+      {topTab === 'workflows' && !showProcurementWorkbench && (
+        <div className="space-y-6">
+          {/* Featured Hero: Autonomous Procurement Workflow */}
+          <div className="relative overflow-hidden bg-gradient-to-r from-emerald-950/60 via-slate-900 to-amber-950/40 border border-emerald-500/30 rounded-2xl p-6 shadow-xl">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 relative z-10">
+              <div className="space-y-2 max-w-2xl">
+                <div className="flex items-center gap-2">
+                  <span className="px-2.5 py-1 rounded-md bg-emerald-500 text-black text-xs font-black uppercase tracking-wider">
+                    Core Autonomous Workflow
+                  </span>
+                  <span className="flex items-center gap-1.5 text-xs text-emerald-400 font-bold">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                    LINE Agent Active & Ready
+                  </span>
+                </div>
+                <h2 className="text-xl font-black text-white">
+                  🤖 ระบบจัดซื้อ & สั่งของซัพพลายเออร์ผ่าน LINE อัตโนมัติ (LINE Procurement)
+                </h2>
+                <p className="text-sm text-gray-300 leading-relaxed">
+                  เชื่อมต่อสต็อกวัตถุดิบเข้ากับ LINE กลุ่มของซัพพลายเออร์ สั่งซื้ออัตโนมัติเมื่อสต็อกต่ำกว่าเกณฑ์ความปลอดภัย ตรวจสอบสลิปผ่าน AI OCR และรองรับ 1-Click PromptPay Payment
+                </p>
+                <div className="flex flex-wrap items-center gap-3 pt-2">
+                  <div className="flex items-center gap-1.5 text-xs text-gray-300 bg-black/30 px-3 py-1.5 rounded-lg border border-white/10">
+                    <Truck size={14} className="text-amber-400" />
+                    <span>{suppliers.length} ซัพพลายเออร์ในระบบ</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-xs text-gray-300 bg-black/30 px-3 py-1.5 rounded-lg border border-white/10">
+                    <AlertTriangle size={14} className="text-rose-400" />
+                    <span>{inventory.filter((i) => i.currentStock <= i.minSafetyThreshold).length} รายการสต็อกวิกฤต</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-xs text-gray-300 bg-black/30 px-3 py-1.5 rounded-lg border border-white/10">
+                    <MessageSquare size={14} className="text-emerald-400" />
+                    <span>{lineLogs.length} ข้อความ LINE Logs</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex flex-col sm:flex-row lg:flex-col gap-3">
+                <button
+                  onClick={() => setShowProcurementWorkbench(true)}
+                  className="flex items-center justify-center gap-2 px-6 py-3.5 bg-emerald-500 hover:bg-emerald-400 text-black font-black rounded-xl transition-all shadow-lg shadow-emerald-500/20"
+                >
+                  <Bot size={18} />
+                  <span>เข้าสู่ห้องควบคุมจัดซื้อ (Procurement Suite)</span>
+                  <ExternalLink size={16} />
+                </button>
+                <button
+                  onClick={() => {
+                    const lowStockItem = inventory.find((i) => i.currentStock <= i.minSafetyThreshold);
+                    if (lowStockItem) {
+                      triggerAutoPOForLowStock(lowStockItem.id);
+                    } else if (inventory[0]) {
+                      triggerAutoPOForLowStock(inventory[0].id);
+                    }
+                    setShowProcurementWorkbench(true);
+                  }}
+                  className="flex items-center justify-center gap-2 px-5 py-2.5 bg-white/10 hover:bg-white/15 text-white text-xs font-bold rounded-xl border border-white/10 transition-all"
+                >
+                  <Play size={14} className="text-amber-400" />
+                  <span>ทดสอบจำลอง Auto-PO สั่งด่วน</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Workflow Catalog Filters & Create Action */}
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-2 overflow-x-auto pb-1 max-w-full">
+              {[
+                { id: 'all', label: 'ทั้งหมด' },
+                { id: 'procurement', label: '📦 จัดซื้อ' },
+                { id: 'finance', label: '💰 การเงิน' },
+                { id: 'operations', label: '🍳 ครัว & งานร้าน' },
+                { id: 'customer', label: '🌟 ลูกค้า' },
+              ].map((f) => (
+                <button
+                  key={f.id}
+                  onClick={() => setWorkflowCategoryFilter(f.id)}
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
+                    workflowCategoryFilter === f.id
+                      ? 'bg-amber-500/20 text-amber-400 border border-amber-500/40'
+                      : 'bg-white/5 text-gray-400 hover:text-white border border-transparent'
+                  }`}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
+
             <button
               onClick={() => {
-                setEditingSupplier(null);
-                setSupForm({
-                  name: '',
-                  contactPerson: '',
-                  phone: '',
-                  lineId: '',
-                  lineGroup: '',
-                  category: 'เนื้อสด & ชิ้นส่วนวัว',
-                  promptPayId: '',
-                  accountName: '',
-                  bankName: 'PromptPay (กสิกรไทย)',
-                  creditDays: 0,
-                  workflowConfig: {
-                    channelMethod: 'line_group',
-                    paymentTerm: 'promptpay_cod',
-                    autoApproveThreshold: 5000,
-                    requireOwnerApproval: false,
-                    autoSendLineOnLowStock: true,
-                    requireDeliveryProofUpload: false,
-                    specialInstructions: '',
-                  },
+                setEditingWorkflow(null);
+                setWfForm({
+                  nameTh: '',
+                  nameEn: '',
+                  category: 'operations',
+                  descriptionTh: '',
+                  descriptionEn: '',
+                  icon: 'Zap',
+                  enabled: true,
+                  triggerType: 'schedule',
+                  triggerCondition: 'ทุกวัน เวลา 08:00 น.',
+                  actions: [
+                    { id: `act-${Date.now()}`, type: 'line_notify', title: 'แจ้งเตือนผ่าน LINE', description: 'ส่งข้อมูลสรุปเข้ากลุ่ม' }
+                  ],
+                  allowedRoles: ['owner', 'manager'],
+                  approverRole: 'manager',
+                  scheduleHuman: 'ทุกวัน 08:00 น.',
+                  linkedSopId: knowledgeDocs[0]?.id || '',
                 });
-                setShowSupplierModal(true);
+                setShowCreateWorkflowModal(true);
               }}
-              className="btn-primary"
-              style={{ padding: '8px 16px', fontSize: 12, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}
+              className="flex items-center gap-2 px-4 py-2.5 bg-amber-500 hover:bg-amber-400 text-black font-black text-sm rounded-xl transition-all shadow-lg shadow-amber-500/10"
             >
-              <Plus size={14} /> เพิ่มซัพพลายเออร์ใหม่
+              <Plus size={16} />
+              <span>สร้างเวิร์กโฟลว์ใหม่ (Create Workflow)</span>
             </button>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: 16 }}>
-            {suppliers.map((sup) => {
-              const wf = sup.workflowConfig;
+          {/* Workflow Cards Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {filteredWorkflows.map((wf) => {
+              const linkedSop = knowledgeDocs.find((d) => d.id === wf.linkedSopId);
               return (
                 <div
-                  key={sup.id}
-                  style={{
-                    background: 'var(--color-bg-card)',
-                    border: '1px solid var(--color-border)',
-                    borderRadius: 14,
-                    padding: 18,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: 12,
-                  }}
+                  key={wf.id}
+                  className={`bg-slate-900/80 border rounded-2xl p-5 flex flex-col justify-between transition-all hover:border-amber-500/40 ${
+                    wf.enabled ? 'border-white/10 shadow-lg' : 'border-white/5 opacity-60 bg-black/40'
+                  }`}
                 >
-                  {/* Supplier Header */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <div>
-                      <h4 style={{ fontSize: 16, fontWeight: 800, margin: 0, color: 'var(--color-primary)' }}>{sup.name}</h4>
-                      <span style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>{sup.category}</span>
-                    </div>
-                    <button
-                      onClick={() => {
-                        setEditingSupplier(sup);
-                        setSupForm({
-                          ...sup,
-                          workflowConfig: sup.workflowConfig || {
-                            channelMethod: 'line_group',
-                            paymentTerm: 'promptpay_cod',
-                            autoApproveThreshold: 5000,
-                            requireOwnerApproval: false,
-                            autoSendLineOnLowStock: true,
-                            requireDeliveryProofUpload: false,
-                            specialInstructions: '',
-                          },
-                        });
-                        setShowSupplierModal(true);
-                      }}
-                      style={{
-                        padding: '6px 10px',
-                        background: 'rgba(6, 182, 212, 0.15)',
-                        border: '1px solid rgba(6, 182, 212, 0.3)',
-                        borderRadius: 6,
-                        color: '#22d3ee',
-                        cursor: 'pointer',
-                        fontSize: 12,
-                        fontWeight: 700,
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 5,
-                      }}
-                    >
-                      <Settings size={14} /> ตั้งค่า Workflow
-                    </button>
-                  </div>
-
-                  {/* Basic Contact Info */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12, color: '#cbd5e1' }}>
-                    <div>
-                      👤 ผู้ติดต่อ: <strong>{sup.contactPerson}</strong> ({sup.phone})
-                    </div>
-                    <div>
-                      💬 LINE Group: <strong style={{ color: '#22d3ee' }}>{sup.lineGroup}</strong> ({sup.lineId})
-                    </div>
-                  </div>
-
-                  {/* Workflow Configuration Badge Box */}
-                  <div style={{ background: 'rgba(15, 23, 42, 0.7)', borderRadius: 10, padding: 12, border: '1px solid rgba(255, 255, 255, 0.08)', display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    <div style={{ fontSize: 11, color: '#06b6d4', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: 5 }}>
-                      <Settings size={12} /> Configured Procurement Workflow
-                    </div>
-
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, fontSize: 12 }}>
-                      <div style={{ background: 'rgba(6, 182, 212, 0.1)', padding: '6px 8px', borderRadius: 6, border: '1px solid rgba(6, 182, 212, 0.2)' }}>
-                        <div style={{ fontSize: 10, color: 'var(--color-text-muted)' }}>ช่องทางสั่งซื้อ</div>
-                        <div style={{ fontWeight: 700, color: '#22d3ee' }}>{getChannelLabel(wf?.channelMethod)}</div>
+                  <div className="space-y-3">
+                    {/* Top Row: Icon, Name, Category & Toggle */}
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center">
+                          {getWorkflowIcon(wf.icon)}
+                        </div>
+                        <div>
+                          <div className="font-bold text-white text-base leading-snug">{wf.nameTh}</div>
+                          <div className="text-xs text-gray-400">{wf.nameEn}</div>
+                        </div>
                       </div>
 
-                      <div style={{ background: 'rgba(168, 85, 247, 0.1)', padding: '6px 8px', borderRadius: 6, border: '1px solid rgba(168, 85, 247, 0.2)' }}>
-                        <div style={{ fontSize: 10, color: 'var(--color-text-muted)' }}>การชำระเงิน</div>
-                        <div style={{ fontWeight: 700, color: '#c084fc' }}>{getPaymentTermLabel(wf?.paymentTerm)}</div>
-                      </div>
+                      {/* Enable Switch */}
+                      <button
+                        onClick={() => toggleWorkflow(wf.id)}
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                          wf.enabled ? 'bg-amber-500' : 'bg-gray-700'
+                        }`}
+                      >
+                        <span
+                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                            wf.enabled ? 'translate-x-6' : 'translate-x-1'
+                          }`}
+                        />
+                      </button>
                     </div>
 
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 11, paddingTop: 4 }}>
-                      <span style={{ color: 'var(--color-text-secondary)' }}>วงเงินอนุมัติอัตโนมัติ:</span>
-                      <span style={{ fontWeight: 800, color: 'var(--color-primary)', fontFamily: 'var(--font-mono)' }}>
-                        ≤ ฿{(wf?.autoApproveThreshold ?? 5000).toLocaleString()}
+                    {/* Category & Trigger Condition */}
+                    <div className="flex flex-wrap items-center gap-2 pt-1">
+                      {getCategoryBadge(wf.category)}
+                      <span className="px-2 py-0.5 rounded-md bg-white/5 text-gray-300 text-xs border border-white/10 flex items-center gap-1.5">
+                        <Clock size={12} className="text-amber-400" />
+                        {wf.scheduleHuman || wf.triggerCondition}
                       </span>
                     </div>
 
-                    {wf?.requireOwnerApproval && (
-                      <div style={{ fontSize: 11, color: '#f87171', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 4 }}>
-                        <Lock size={12} /> ต้องให้ Owner อนุมัติ PIN ทุกครั้ง
-                      </div>
-                    )}
+                    {/* Description */}
+                    <p className="text-xs text-gray-300 line-clamp-2 leading-relaxed">
+                      {wf.descriptionTh}
+                    </p>
 
-                    {wf?.specialInstructions && (
-                      <div style={{ fontSize: 11, color: '#fbbf24', fontStyle: 'italic', background: 'rgba(245, 158, 11, 0.1)', padding: '4px 8px', borderRadius: 6 }}>
-                        📌 "{wf.specialInstructions}"
+                    {/* Action Pipeline Steps Preview */}
+                    <div className="bg-black/30 border border-white/5 rounded-xl p-3 space-y-1.5">
+                      <div className="text-[11px] font-bold text-gray-400 uppercase tracking-wider flex items-center justify-between">
+                        <span>ลำดับการทำงาน (Action Steps):</span>
+                        <span className="text-amber-400">{wf.actions.length} ขั้นตอน</span>
                       </div>
-                    )}
+                      <div className="space-y-1">
+                        {wf.actions.map((act, i) => (
+                          <div key={act.id || i} className="flex items-center gap-2 text-xs text-gray-300">
+                            <span className="w-4 h-4 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center text-[10px] font-bold">
+                              {i + 1}
+                            </span>
+                            <span className="font-medium">{act.title}</span>
+                            {act.targetChannel && (
+                              <span className="text-[10px] text-gray-400 bg-white/5 px-1.5 py-0.5 rounded">
+                                {act.targetChannel}
+                              </span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Roles & Linked SOP */}
+                    <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-[11px] text-gray-400 font-medium">สิทธิ์ใช้งาน:</span>
+                        {wf.allowedRoles.map((r) => getRoleBadge(r))}
+                        {wf.approverRole && (
+                          <span className="text-[10px] text-amber-400/80 ml-1">
+                            (อนุมัติ: {wf.approverRole})
+                          </span>
+                        )}
+                      </div>
+
+                      {linkedSop && (
+                        <button
+                          onClick={() => {
+                            setSelectedDocForView(linkedSop);
+                            setTopTab('km');
+                          }}
+                          className="flex items-center gap-1 text-xs text-emerald-400 hover:text-emerald-300 bg-emerald-500/10 px-2 py-1 rounded-lg border border-emerald-500/20 transition-all"
+                        >
+                          <BookOpen size={12} />
+                          <span>ดู SOP ({linkedSop.version})</span>
+                        </button>
+                      )}
+                    </div>
                   </div>
 
-                  {/* Bank Account Details */}
-                  <div style={{ background: 'rgba(16, 185, 129, 0.08)', padding: 10, borderRadius: 8, border: '1px solid rgba(16, 185, 129, 0.2)' }}>
-                    <div style={{ fontSize: 11, color: '#34d399', fontWeight: 700 }}>🏦 PromptPay Bank Whitelist:</div>
-                    <div style={{ fontFamily: 'var(--font-mono)', fontWeight: 800, marginTop: 2, fontSize: 13 }}>{sup.promptPayId}</div>
-                    <div style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>
-                      {sup.accountName} • {sup.bankName}
+                  {/* Bottom Stats & Trigger Action */}
+                  <div className="border-t border-white/10 mt-4 pt-3 flex items-center justify-between">
+                    <div className="text-[11px] text-gray-400">
+                      รันแล้ว <span className="font-bold text-white">{wf.executionCount}</span> ครั้ง •{' '}
+                      {wf.lastRunAt ? new Date(wf.lastRunAt).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) : 'ยังไม่เคยรัน'}
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      {wf.isSpecialProcurement ? (
+                        <button
+                          onClick={() => setShowProcurementWorkbench(true)}
+                          className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 text-xs font-bold rounded-xl border border-emerald-500/40 transition-all"
+                        >
+                          <Bot size={14} />
+                          <span>เปิดหน้าจัดซื้อ</span>
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => triggerWorkflowWithFeedback(wf)}
+                          className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 text-xs font-bold rounded-xl border border-amber-500/40 transition-all"
+                        >
+                          <Play size={12} />
+                          <span>รันทันที</span>
+                        </button>
+                      )}
+
+                      <button
+                        onClick={() => {
+                          setEditingWorkflow(wf);
+                          setWfForm({
+                            nameTh: wf.nameTh,
+                            nameEn: wf.nameEn,
+                            category: wf.category,
+                            descriptionTh: wf.descriptionTh,
+                            descriptionEn: wf.descriptionEn,
+                            icon: wf.icon,
+                            enabled: wf.enabled,
+                            triggerType: wf.triggerType,
+                            triggerCondition: wf.triggerCondition,
+                            actions: [...wf.actions],
+                            allowedRoles: [...wf.allowedRoles],
+                            approverRole: wf.approverRole || 'manager',
+                            scheduleHuman: wf.scheduleHuman || '',
+                            linkedSopId: wf.linkedSopId || '',
+                          });
+                          setShowCreateWorkflowModal(true);
+                        }}
+                        className="p-1.5 text-gray-400 hover:text-white rounded-lg hover:bg-white/5"
+                        title="แก้ไขเวิร์กโฟลว์"
+                      >
+                        <Edit2 size={14} />
+                      </button>
+
+                      {!wf.isSpecialProcurement && (
+                        <button
+                          onClick={() => deleteWorkflow(wf.id)}
+                          className="p-1.5 text-gray-400 hover:text-rose-400 rounded-lg hover:bg-white/5"
+                          title="ลบเวิร์กโฟลว์"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -820,662 +686,1780 @@ export const ProcurementPanel: React.FC = () => {
         </div>
       )}
 
-      {/* TAB 3: INVENTORY */}
-      {activeSubTab === 'inventory' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <h3 style={{ fontSize: 15, fontWeight: 700, margin: 0 }}>ตารางคลังวัตถุดิบ & สินค้าคงเหลือ</h3>
-            <button
-              onClick={() => {
-                setEditingInventory(null);
-                setShowInventoryModal(true);
-              }}
-              className="btn-primary"
-              style={{ padding: '6px 12px', fontSize: 12 }}
-            >
-              <Plus size={14} /> เพิ่มวัตถุดิบใหม่
-            </button>
+      {/* ========================================================================= */}
+      {/* TAB 1 SUB-VIEW: FULL INTERACTIVE PROCUREMENT WORKBENCH */}
+      {/* ========================================================================= */}
+      {topTab === 'workflows' && showProcurementWorkbench && (
+        <div className="space-y-6">
+          <div className="flex items-center justify-between bg-slate-900 border border-white/10 p-4 rounded-2xl">
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setShowProcurementWorkbench(false)}
+                className="px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white text-xs font-bold rounded-xl transition-all"
+              >
+                ← กลับหน้าเวิร์กโฟลว์หลัก
+              </button>
+              <h2 className="text-lg font-black text-white flex items-center gap-2">
+                <Bot size={20} className="text-emerald-400" />
+                <span>ระบบจัดซื้อ & LINE Agent (Procurement Suite)</span>
+              </h2>
+            </div>
+
+            {/* Sub-tabs for Procurement Workbench */}
+            <div className="flex items-center gap-2">
+              {[
+                { id: 'pos_agent', label: '💬 แชทบอท & ใบสั่งซื้อ', icon: <Bot size={14} /> },
+                { id: 'suppliers', label: '🏢 ซัพพลายเออร์', icon: <Building2 size={14} /> },
+                { id: 'inventory', label: '📦 สต็อก & เกณฑ์เตือน', icon: <Package size={14} /> },
+                { id: 'settings', label: '⚙️ ตั้งค่าบอท', icon: <Settings size={14} /> },
+              ].map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setProcurementSubTab(tab.id as any)}
+                  className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all ${
+                    procurementSubTab === tab.id
+                      ? 'bg-emerald-500 text-black shadow-lg shadow-emerald-500/20'
+                      : 'text-gray-400 hover:text-white bg-white/5'
+                  }`}
+                >
+                  {tab.icon}
+                  <span>{tab.label}</span>
+                </button>
+              ))}
+            </div>
           </div>
 
-          <div style={{ background: 'var(--color-bg-card)', border: '1px solid var(--color-border)', borderRadius: 12, overflow: 'hidden' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: 13 }}>
-              <thead>
-                <tr style={{ background: 'rgba(15, 23, 42, 0.6)', borderBottom: '1px solid var(--color-border)', color: 'var(--color-text-secondary)' }}>
-                  <th style={{ padding: 12 }}>รายการวัตถุดิบ</th>
-                  <th style={{ padding: 12 }}>หมวดหมู่</th>
-                  <th style={{ padding: 12 }}>สต็อกคงเหลือ</th>
-                  <th style={{ padding: 12 }}>จุดสั่งซื้อขั้นต่ำ</th>
-                  <th style={{ padding: 12 }}>ต้นทุนเฉลี่ย / หน่วย</th>
-                  <th style={{ padding: 12 }}>ซัพพลายเออร์หลัก</th>
-                  <th style={{ padding: 12, textAlign: 'center' }}>จัดการ & AI Auto-PO</th>
-                </tr>
-              </thead>
-              <tbody>
-                {inventory.map((item) => {
-                  const isLow = item.currentStock <= item.minSafetyThreshold;
-                  const supplier = suppliers.find((s) => s.id === item.supplierId);
-                  return (
-                    <tr key={item.id} style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.05)' }}>
-                      <td style={{ padding: 12, fontWeight: 700 }}>
-                        {item.nameTh}
-                        <div style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>{item.nameEn}</div>
-                      </td>
-                      <td style={{ padding: 12 }}>{item.category}</td>
-                      <td style={{ padding: 12 }}>
-                        <span style={{ fontSize: 14, fontWeight: 800, color: isLow ? '#f87171' : '#34d399' }}>
-                          {item.currentStock} {item.unit}
-                        </span>
-                        {isLow && (
-                          <span style={{ marginLeft: 6, fontSize: 10, padding: '2px 6px', borderRadius: 8, background: 'rgba(239, 68, 68, 0.2)', color: '#f87171', fontWeight: 700 }}>
-                            ⚠️ ต่ำกว่าขั้นต่ำ
+          {/* PROCUREMENT SUBTAB: PO & LINE AGENT */}
+          {procurementSubTab === 'pos_agent' && (
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+              {/* Left Column: PO List */}
+              <div className="lg:col-span-7 space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-base font-bold text-white flex items-center gap-2">
+                    <FileText size={18} className="text-amber-400" />
+                    <span>รายการใบสั่งซื้อสินค้า (Purchase Orders)</span>
+                  </h3>
+                  <button
+                    onClick={() => setShowNewPOModal(true)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500 text-black font-bold text-xs rounded-xl hover:bg-amber-400 transition-all"
+                  >
+                    <Plus size={14} />
+                    <span>+ สร้าง PO ใหม่</span>
+                  </button>
+                </div>
+
+                <div className="space-y-3">
+                  {purchaseOrders.map((po) => (
+                    <div
+                      key={po.id}
+                      className="bg-slate-900 border border-white/10 rounded-2xl p-4 space-y-3 hover:border-emerald-500/40 transition-all"
+                    >
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-black text-amber-400 text-sm">{po.poNumber}</span>
+                            {getStatusBadge(po.status)}
+                          </div>
+                          <div className="text-xs text-gray-300 font-semibold mt-1">
+                            🏢 {po.supplierName}
+                          </div>
+                          <div className="text-[11px] text-gray-500">
+                            สร้างเมื่อ {new Date(po.createdAt).toLocaleString('th-TH')} โดย {po.createdBy}
+                          </div>
+                        </div>
+
+                        <div className="text-right">
+                          <div className="text-xs text-gray-400">ยอดรวมทั้งสิ้น</div>
+                          <div className="text-lg font-black text-emerald-400">฿{po.grandTotal.toLocaleString()}</div>
+                        </div>
+                      </div>
+
+                      {/* Items */}
+                      <div className="bg-black/30 rounded-xl p-2.5 space-y-1">
+                        {po.items.map((it, idx) => (
+                          <div key={idx} className="flex items-center justify-between text-xs text-gray-300">
+                            <span>• {it.nameTh} ({it.qtyOrdered} {it.unit})</span>
+                            <span className="font-semibold text-gray-200">฿{it.total.toLocaleString()}</span>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* PO Action Buttons */}
+                      <div className="flex items-center justify-end gap-2 pt-1 border-t border-white/5">
+                        {po.status === 'draft' && (
+                          <button
+                            onClick={() => sendPOToLineGroup(po.id)}
+                            className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded-xl transition-all"
+                          >
+                            <Send size={12} />
+                            <span>ส่ง LINE กลุ่มซัพพลายเออร์</span>
+                          </button>
+                        )}
+
+                        {po.status === 'sent_line' && (
+                          <button
+                            onClick={() => simulateSupplierLineReply(po.id)}
+                            className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs rounded-xl transition-all"
+                          >
+                            <MessageSquare size={12} />
+                            <span>จำลองร้านตอบบิล & QR</span>
+                          </button>
+                        )}
+
+                        {(po.status === 'ocr_received' || po.status === 'reconciled') && (
+                          <button
+                            onClick={() => setSelectedPOForPay(po)}
+                            className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-xs rounded-xl transition-all shadow-lg shadow-emerald-500/20"
+                          >
+                            <QrCode size={12} />
+                            <span>สแกนจ่าย PromptPay (฿{po.grandTotal.toLocaleString()})</span>
+                          </button>
+                        )}
+
+                        {po.status === 'completed' && (
+                          <span className="text-xs text-emerald-400 font-bold flex items-center gap-1">
+                            <CheckCircle2 size={14} />
+                            <span>ชำระเงินเรียบร้อย & เข้าสต็อกแล้ว</span>
                           </span>
                         )}
-                      </td>
-                      <td style={{ padding: 12 }}>
-                        {item.minSafetyThreshold} {item.unit}
-                      </td>
-                      <td style={{ padding: 12, fontFamily: 'var(--font-mono)' }}>฿{item.avgCost}</td>
-                      <td style={{ padding: 12 }}>{supplier?.name || '-'}</td>
-                      <td style={{ padding: 12, textAlign: 'center' }}>
-                        <div style={{ display: 'flex', gap: 6, justifyContent: 'center' }}>
-                          {isLow && (
-                            <button
-                              onClick={() => triggerAutoPOForLowStock(item.id)}
-                              style={{
-                                padding: '4px 8px',
-                                borderRadius: 6,
-                                background: 'linear-gradient(135deg, #06b6d4, #3b82f6)',
-                                border: 'none',
-                                color: '#fff',
-                                fontSize: 11,
-                                fontWeight: 700,
-                                cursor: 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: 4,
-                              }}
-                            >
-                              <Bot size={13} />
-                              <span>🤖 สั่งซื้อ LINE ทันที</span>
-                            </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Right Column: Live LINE Chat Logs */}
+              <div className="lg:col-span-5 space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-base font-bold text-white flex items-center gap-2">
+                    <MessageSquare size={18} className="text-emerald-400" />
+                    <span>LINE Chat Simulator (ข้อความสด)</span>
+                  </h3>
+                  <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-xs font-bold">
+                    Connected
+                  </span>
+                </div>
+
+                <div className="bg-slate-950 border border-white/10 rounded-2xl p-4 h-[550px] overflow-y-auto space-y-3 flex flex-col justify-start">
+                  {lineLogs.map((log) => (
+                    <div
+                      key={log.id}
+                      className={`flex flex-col max-w-[85%] ${
+                        log.direction === 'outbound' ? 'self-end items-end' : 'self-start items-start'
+                      }`}
+                    >
+                      <div className="text-[10px] text-gray-400 mb-1 px-1">
+                        {log.sender} • {new Date(log.timestamp).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })}
+                      </div>
+                      <div
+                        className={`p-3 rounded-2xl text-xs leading-relaxed whitespace-pre-line shadow-md ${
+                          log.direction === 'outbound'
+                            ? 'bg-emerald-600 text-white rounded-tr-none'
+                            : 'bg-slate-800 text-gray-200 border border-white/10 rounded-tl-none'
+                        }`}
+                      >
+                        {log.messageText}
+                        {log.imageUrl && (
+                          <div className="mt-2 rounded-lg overflow-hidden border border-white/10">
+                            <img src={log.imageUrl} alt="Bill attachment" className="w-full h-32 object-cover" />
+                          </div>
+                        )}
+                        {log.ocrStatus && (
+                          <div className="mt-2 pt-1 border-t border-white/10 text-[10px] font-bold text-emerald-300 flex items-center gap-1">
+                            <ShieldCheck size={12} />
+                            <span>OCR Status: {log.ocrStatus.toUpperCase()} (PromptPay Verified)</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* PROCUREMENT SUBTAB: SUPPLIERS */}
+          {procurementSubTab === 'suppliers' && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-base font-bold text-white">รายชื่อซัพพลายเออร์ที่ลงทะเบียน</h3>
+                  <p className="text-xs text-gray-400">กำหนดช่องทางสั่งของ อนุมัติวงเงินอัตโนมัติ และเลข PromptPay บัญชีคู่ค้า</p>
+                </div>
+                <button
+                  onClick={() => {
+                    setEditingSupplier(null);
+                    setSupForm({
+                      name: '',
+                      contactPerson: '',
+                      phone: '',
+                      lineId: '',
+                      lineGroup: '',
+                      category: 'เนื้อสด & ชิ้นส่วนวัว',
+                      promptPayId: '',
+                      accountName: '',
+                      bankName: 'PromptPay (กสิกรไทย)',
+                      creditDays: 0,
+                      workflowConfig: {
+                        channelMethod: 'line_group',
+                        paymentTerm: 'promptpay_cod',
+                        autoApproveThreshold: 5000,
+                        requireOwnerApproval: false,
+                        autoSendLineOnLowStock: true,
+                        requireDeliveryProofUpload: false,
+                        specialInstructions: '',
+                      },
+                    });
+                    setShowSupplierModal(true);
+                  }}
+                  className="flex items-center gap-1.5 px-4 py-2 bg-emerald-500 text-black font-bold text-xs rounded-xl hover:bg-emerald-400 transition-all"
+                >
+                  <Plus size={14} />
+                  <span>+ เพิ่มซัพพลายเออร์</span>
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {suppliers.map((sup) => (
+                  <div key={sup.id} className="bg-slate-900 border border-white/10 rounded-2xl p-4 space-y-3">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400">
+                          {sup.category}
+                        </span>
+                        <h4 className="font-bold text-white text-base mt-1">{sup.name}</h4>
+                        <div className="text-xs text-gray-400">ติดต่อ: {sup.contactPerson} ({sup.phone})</div>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => {
+                            setEditingSupplier(sup);
+                            setSupForm(sup);
+                            setShowSupplierModal(true);
+                          }}
+                          className="p-1 text-gray-400 hover:text-white rounded"
+                        >
+                          <Edit2 size={14} />
+                        </button>
+                        <button
+                          onClick={() => deleteSupplier(sup.id)}
+                          className="p-1 text-gray-400 hover:text-rose-400 rounded"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="bg-black/30 rounded-xl p-2.5 text-xs space-y-1 text-gray-300">
+                      <div>📱 LINE กลุ่ม: <span className="text-emerald-400 font-semibold">{sup.lineGroup || sup.lineId || 'ยังไม่ระบุ'}</span></div>
+                      <div>⚡ PromptPay: <span className="text-amber-400 font-semibold">{sup.promptPayId} ({sup.accountName})</span></div>
+                      <div>🏦 ธนาคาร: {sup.bankName}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* PROCUREMENT SUBTAB: INVENTORY */}
+          {procurementSubTab === 'inventory' && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-base font-bold text-white">ระดับสต็อกวัตถุดิบ & เกณฑ์ความปลอดภัย (Safety Stock)</h3>
+                  <p className="text-xs text-gray-400">เมื่อคงเหลือต่ำกว่าเกณฑ์ ระบบจะทริกเกอร์สร้าง PO สั่งซื้ออัตโนมัติทันที</p>
+                </div>
+                <button
+                  onClick={() => {
+                    setEditingInventory(null);
+                    setInvForm({
+                      nameTh: '',
+                      nameEn: '',
+                      unit: 'kg',
+                      currentStock: 10,
+                      minSafetyThreshold: 15,
+                      avgCost: 200,
+                      supplierId: suppliers[0]?.id || '',
+                      category: 'วัตถุดิบครัว',
+                    });
+                    setShowInventoryModal(true);
+                  }}
+                  className="flex items-center gap-1.5 px-4 py-2 bg-emerald-500 text-black font-bold text-xs rounded-xl hover:bg-emerald-400 transition-all"
+                >
+                  <Plus size={14} />
+                  <span>+ เพิ่มวัตถุดิบ</span>
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {inventory.map((inv) => {
+                  const isLow = inv.currentStock <= inv.minSafetyThreshold;
+                  const supplier = suppliers.find((s) => s.id === inv.supplierId);
+                  return (
+                    <div
+                      key={inv.id}
+                      className={`bg-slate-900 border rounded-2xl p-4 space-y-3 ${
+                        isLow ? 'border-rose-500/50 bg-rose-950/20' : 'border-white/10'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <div className="font-bold text-white text-base">{inv.nameTh}</div>
+                          <div className="text-xs text-gray-400">{inv.nameEn}</div>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          {isLow ? (
+                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/40 animate-pulse">
+                              ⚠️ สต็อกวิกฤต
+                            </span>
+                          ) : (
+                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-300">
+                              ปกติ
+                            </span>
                           )}
                           <button
                             onClick={() => {
-                              setEditingInventory(item);
-                              setInvForm(item);
+                              setEditingInventory(inv);
+                              setInvForm(inv);
                               setShowInventoryModal(true);
                             }}
-                            style={{ padding: 4, background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer' }}
+                            className="p-1 text-gray-400 hover:text-white rounded"
                           >
-                            <Edit2 size={15} />
+                            <Edit2 size={13} />
+                          </button>
+                          <button
+                            onClick={() => deleteInventoryItem(inv.id)}
+                            className="p-1 text-gray-400 hover:text-rose-400 rounded"
+                          >
+                            <Trash2 size={13} />
                           </button>
                         </div>
-                      </td>
-                    </tr>
+                      </div>
+
+                      <div className="flex items-center justify-between bg-black/30 p-2.5 rounded-xl">
+                        <div>
+                          <div className="text-[10px] text-gray-400">คงเหลือปัจจุบัน</div>
+                          <div className="text-lg font-black text-white">{inv.currentStock} {inv.unit}</div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-[10px] text-gray-400">เกณฑ์เตือน (Min Safety)</div>
+                          <div className="text-sm font-bold text-amber-400">{inv.minSafetyThreshold} {inv.unit}</div>
+                        </div>
+                      </div>
+
+                      <div className="text-xs text-gray-400 flex items-center justify-between">
+                        <span>ซัพพลายเออร์: {supplier?.name || 'ไม่ระบุ'}</span>
+                        <span>ต้นทุนเฉลี่ย: ฿{inv.avgCost}/{inv.unit}</span>
+                      </div>
+
+                      {isLow && (
+                        <button
+                          onClick={() => triggerAutoPOForLowStock(inv.id)}
+                          className="w-full py-2 bg-rose-500 hover:bg-rose-400 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-lg shadow-rose-500/20"
+                        >
+                          <Zap size={14} />
+                          <span>สร้าง PO สั่งของด่วนผ่าน LINE ทันที</span>
+                        </button>
+                      )}
+                    </div>
                   );
                 })}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* TAB 4: AGENT SETTINGS & RBAC */}
-      {activeSubTab === 'settings' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 650 }}>
-          <h3 style={{ fontSize: 15, fontWeight: 700, margin: 0 }}>ตั้งค่าความปลอดภัย & การทำงานของ AI Agent</h3>
-
-          <div style={{ background: 'var(--color-bg-card)', border: '1px solid var(--color-border)', borderRadius: 12, padding: 18, display: 'flex', flexDirection: 'column', gap: 16 }}>
-            {/* Toggle Bot */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <div style={{ fontSize: 14, fontWeight: 700 }}>เปิดการทำงานบอทจัดซื้อ AI (LINE Procurement Agent)</div>
-                <div style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>ส่งข้อความสั่งซื้อ และอ่าน OCR ใบเสร็จจาก LINE Group อัตโนมัติ</div>
-              </div>
-              <input
-                type="checkbox"
-                checked={lineAgentConfig.botEnabled}
-                onChange={(e) => updateLineAgentConfig({ botEnabled: e.target.checked })}
-                style={{ width: 18, height: 18, cursor: 'pointer' }}
-              />
-            </div>
-
-            <hr style={{ border: 'none', borderTop: '1px solid var(--color-border)', margin: 0 }} />
-
-            {/* Threshold Limit */}
-            <div>
-              <label style={{ fontSize: 13, fontWeight: 700, display: 'block', marginBottom: 6 }}>
-                วงเงินสิทธิ์ส่งสั่งซื้ออัตโนมัติเริ่มต้น (Default Manager Approval Limit)
-              </label>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <input
-                  type="number"
-                  value={lineAgentConfig.autoApprovalThreshold}
-                  onChange={(e) => updateLineAgentConfig({ autoApprovalThreshold: parseFloat(e.target.value) || 0 })}
-                  style={{
-                    padding: '8px 12px',
-                    borderRadius: 6,
-                    background: 'var(--color-bg-elevated)',
-                    border: '1px solid var(--color-border)',
-                    color: '#fff',
-                    fontSize: 14,
-                    width: 160,
-                  }}
-                />
-                <span style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>บาท (สามารถตั้งค่าแยกรายซัพพลายเออร์ได้ในแท็บ ซัพพลายเออร์)</span>
               </div>
             </div>
+          )}
 
-            <hr style={{ border: 'none', borderTop: '1px solid var(--color-border)', margin: 0 }} />
-
-            {/* Auto send on low stock */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <div style={{ fontSize: 14, fontWeight: 700 }}>สั่งซื้อสินค้าอัตโนมัติทันทีเมื่อวัตถุดิบต่ำกว่าจุดปลอดภัย</div>
-                <div style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>สร้าง PO และส่งข้อความ LINE ทันทีโดยไม่ต้องกดมือ</div>
-              </div>
-              <input
-                type="checkbox"
-                checked={lineAgentConfig.autoSendLineOnLowStock}
-                onChange={(e) => updateLineAgentConfig({ autoSendLineOnLowStock: e.target.checked })}
-                style={{ width: 18, height: 18, cursor: 'pointer' }}
-              />
-            </div>
-
-            <hr style={{ border: 'none', borderTop: '1px solid var(--color-border)', margin: 0 }} />
-
-            {/* Bank Whitelist toggle */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <div style={{ fontSize: 14, fontWeight: 700 }}>ตรวจสอบ Whitelist บัญชี PromptPay ซัพพลายเออร์</div>
-                <div style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>ป้องกัน QR แอบอ้าง โดยตรวจสอบตรงกับบัญชีที่ลงทะเบียนไว้</div>
-              </div>
-              <input
-                type="checkbox"
-                checked={lineAgentConfig.verifySupplierBankWhitelist}
-                onChange={(e) => updateLineAgentConfig({ verifySupplierBankWhitelist: e.target.checked })}
-                style={{ width: 18, height: 18, cursor: 'pointer' }}
-              />
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL: 1-Click PromptPay Payment Modal */}
-      {selectedPOForPay && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0, 0, 0, 0.75)', backdropFilter: 'blur(8px)', zIndex: 999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-          <div
-            style={{
-              background: 'var(--color-bg-card)',
-              border: '1px solid var(--color-border)',
-              borderRadius: 16,
-              width: '100%',
-              maxWidth: 480,
-              padding: 24,
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 16,
-            }}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h3 style={{ fontSize: 16, fontWeight: 800, margin: 0, color: 'var(--color-primary)' }}>
-                ชำระเงิน PromptPay & ตัดสต็อกเข้าคลัง ({selectedPOForPay.poNumber})
+          {/* PROCUREMENT SUBTAB: SETTINGS */}
+          {procurementSubTab === 'settings' && (
+            <div className="max-w-2xl bg-slate-900 border border-white/10 rounded-2xl p-6 space-y-6">
+              <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                <Settings size={20} className="text-amber-400" />
+                <span>การตั้งค่า LINE Agent & Autonomous Engine</span>
               </h3>
-              <button onClick={() => setSelectedPOForPay(null)} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer' }}>
+
+              <div className="space-y-4">
+                <div className="flex items-center justify-between p-3 bg-black/30 rounded-xl border border-white/5">
+                  <div>
+                    <div className="font-bold text-sm text-white">เปิดใช้งาน LINE Procurement Agent</div>
+                    <div className="text-xs text-gray-400">ส่งและรับข้อความในกลุ่ม LINE ซัพพลายเออร์อัตโนมัติ</div>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={lineAgentConfig.botEnabled}
+                    onChange={(e) => updateLineAgentConfig({ botEnabled: e.target.checked })}
+                    className="w-5 h-5 accent-emerald-500"
+                  />
+                </div>
+
+                <div className="flex items-center justify-between p-3 bg-black/30 rounded-xl border border-white/5">
+                  <div>
+                    <div className="font-bold text-sm text-white">สั่ง PO อัตโนมัติเมื่อสต็อกต่ำ (Auto-PO on Low Stock)</div>
+                    <div className="text-xs text-gray-400">สร้างใบสั่งซื้อและยิงเข้า LINE ซัพพลายเออร์ทันทีที่ต่ำกว่าเกณฑ์</div>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={lineAgentConfig.autoSendLineOnLowStock}
+                    onChange={(e) => updateLineAgentConfig({ autoSendLineOnLowStock: e.target.checked })}
+                    className="w-5 h-5 accent-emerald-500"
+                  />
+                </div>
+
+                <div className="flex items-center justify-between p-3 bg-black/30 rounded-xl border border-white/5">
+                  <div>
+                    <div className="font-bold text-sm text-white">ตรวจสอบบัญชีธนาคาร Whitelist (Anti-Fraud)</div>
+                    <div className="text-xs text-gray-400">ป้องกันการโอนเงินผิดบัญชีโดยตรวจจับเลข PromptPay ใน QR</div>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={lineAgentConfig.verifySupplierBankWhitelist}
+                    onChange={(e) => updateLineAgentConfig({ verifySupplierBankWhitelist: e.target.checked })}
+                    className="w-5 h-5 accent-emerald-500"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* TAB 2: RBAC SCHEDULING (ตารางเวลา & การกำหนดสิทธิ์) */}
+      {/* ========================================================================= */}
+      {topTab === 'scheduling' && (
+        <div className="space-y-6">
+          {/* Daily Schedule Timeline Card */}
+          <div className="bg-slate-900 border border-white/10 rounded-2xl p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-black text-white flex items-center gap-2">
+                  <Calendar size={20} className="text-blue-400" />
+                  <span>ไทม์ไลน์รอบการทำงานอัตโนมัติตลอดวัน (24h Automation Timeline)</span>
+                </h2>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  ระบบจะตรวจสอบและประมวลผลงานตามเวลาที่กำหนดโดยไม่ต้องรอคนกดสั่ง
+                </p>
+              </div>
+
+              <button
+                onClick={() => {
+                  setEditingSchedule(null);
+                  setSchForm({
+                    workflowId: workflows[0]?.id || '',
+                    title: '',
+                    timeOfDay: '08:00',
+                    daysOfWeek: [0, 1, 2, 3, 4, 5, 6],
+                    cronExpression: '0 8 * * *',
+                    enabled: true,
+                    targetAction: '',
+                    allowedRoles: ['owner', 'manager'],
+                    requireApproval: false,
+                    approverRole: 'manager',
+                    status: 'active',
+                  });
+                  setShowScheduleModal(true);
+                }}
+                className="flex items-center gap-2 px-4 py-2.5 bg-blue-500 hover:bg-blue-400 text-white font-bold text-xs rounded-xl transition-all shadow-lg shadow-blue-500/20"
+              >
+                <Plus size={16} />
+                <span>+ เพิ่มตารางเวลาใหม่ (Add Schedule)</span>
+              </button>
+            </div>
+
+            {/* Timeline Visual Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-2">
+              <div className="bg-blue-950/40 border border-blue-500/30 p-4 rounded-xl space-y-1">
+                <div className="text-xs font-bold text-blue-400">🌅 รอบเช้า (07:00 น.)</div>
+                <div className="font-black text-white text-sm">ต้มน้ำซุป & หมักเนื้อ</div>
+                <div className="text-[11px] text-gray-300">ส่ง KDS Alert & เช็ค SOP-KIT-01</div>
+              </div>
+
+              <div className="bg-amber-950/40 border border-amber-500/30 p-4 rounded-xl space-y-1">
+                <div className="text-xs font-bold text-amber-400">☀️ รอบบ่าย (14:00 น.)</div>
+                <div className="font-black text-white text-sm">สแกนสต็อก & เตือนสั่งของ</div>
+                <div className="text-[11px] text-gray-300">เช็ค Safety Stock & ร่าง PO</div>
+              </div>
+
+              <div className="bg-purple-950/40 border border-purple-500/30 p-4 rounded-xl space-y-1">
+                <div className="text-xs font-bold text-purple-400">🌙 รอบค่ำ (22:30 น.)</div>
+                <div className="font-black text-white text-sm">สรุปยอดเงินสดปิดกะ</div>
+                <div className="text-[11px] text-gray-300">พิมพ์ Z-Report & เตือนผลต่างเงิน</div>
+              </div>
+
+              <div className="bg-emerald-950/40 border border-emerald-500/30 p-4 rounded-xl space-y-1">
+                <div className="text-xs font-bold text-emerald-400">🌌 เที่ยงคืน (23:45 น.)</div>
+                <div className="font-black text-white text-sm">Sync โปรแกรมบัญชี & ภาษี</div>
+                <div className="text-[11px] text-gray-300">ยิง FlowAccount Webhook</div>
+              </div>
+            </div>
+          </div>
+
+          {/* RBAC Capability Matrix */}
+          <div className="bg-slate-900 border border-white/10 rounded-2xl p-6 space-y-4">
+            <div>
+              <h3 className="text-base font-bold text-white flex items-center gap-2">
+                <Shield size={18} className="text-amber-400" />
+                <span>ตารางสิทธิ์การทำงานตามบทบาท (RBAC Permission Matrix)</span>
+              </h3>
+              <p className="text-xs text-gray-400">ควบคุมสิทธิ์ว่าพนักงานตำแหน่งใดสามารถ สั่งรัน อนุมัติ หรือแก้ไขเวิร์กโฟลว์ได้</p>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs text-gray-300">
+                <thead className="bg-white/5 uppercase text-gray-400 border-b border-white/10">
+                  <tr>
+                    <th className="py-3 px-4">บทบาทพนักงาน (Role)</th>
+                    <th className="py-3 px-4 text-center">ทดสอบรันทันที (Trigger)</th>
+                    <th className="py-3 px-4 text-center">อนุมัติ PO / ปิดกะ (Approve)</th>
+                    <th className="py-3 px-4 text-center">แก้ไขเวิร์กโฟลว์ & เวลา</th>
+                    <th className="py-3 px-4 text-center">อ่าน / เช็คลิสต์ SOP</th>
+                    <th className="py-3 px-4 text-center">เข้าถึง API Keys</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/5">
+                  <tr>
+                    <td className="py-3 px-4 font-bold text-amber-400">👑 เจ้าของร้าน (Owner)</td>
+                    <td className="py-3 px-4 text-center text-emerald-400 font-bold">✓ ทุกงาน</td>
+                    <td className="py-3 px-4 text-center text-emerald-400 font-bold">✓ อนุมัติได้สูงสุด</td>
+                    <td className="py-3 px-4 text-center text-emerald-400 font-bold">✓ แก้ไขได้ทั้งหมด</td>
+                    <td className="py-3 px-4 text-center text-emerald-400 font-bold">✓ อ่าน/แก้ไข</td>
+                    <td className="py-3 px-4 text-center text-emerald-400 font-bold">✓ เข้าถึงได้</td>
+                  </tr>
+                  <tr>
+                    <td className="py-3 px-4 font-bold text-purple-400">🛡️ ผู้ดูแลระบบ (Admin)</td>
+                    <td className="py-3 px-4 text-center text-emerald-400 font-bold">✓ ทุกงาน</td>
+                    <td className="py-3 px-4 text-center text-gray-500">-</td>
+                    <td className="py-3 px-4 text-center text-emerald-400 font-bold">✓ แก้ไขได้ทั้งหมด</td>
+                    <td className="py-3 px-4 text-center text-emerald-400 font-bold">✓ อ่าน/แก้ไข</td>
+                    <td className="py-3 px-4 text-center text-emerald-400 font-bold">✓ จัดการ Webhooks</td>
+                  </tr>
+                  <tr>
+                    <td className="py-3 px-4 font-bold text-blue-400">👔 ผู้จัดการร้าน (Manager)</td>
+                    <td className="py-3 px-4 text-center text-emerald-400 font-bold">✓ งานร้าน & ครัว</td>
+                    <td className="py-3 px-4 text-center text-emerald-400 font-bold">✓ อนุมัติเบื้องต้น</td>
+                    <td className="py-3 px-4 text-center text-gray-500">-</td>
+                    <td className="py-3 px-4 text-center text-emerald-400 font-bold">✓ อ่าน/ตรวจสอบ</td>
+                    <td className="py-3 px-4 text-center text-gray-500">-</td>
+                  </tr>
+                  <tr>
+                    <td className="py-3 px-4 font-bold text-emerald-400">💵 แคชเชียร์ (Cashier)</td>
+                    <td className="py-3 px-4 text-center text-amber-400">✓ เฉพาะปิดกะเงินสด</td>
+                    <td className="py-3 px-4 text-center text-gray-500">-</td>
+                    <td className="py-3 px-4 text-center text-gray-500">-</td>
+                    <td className="py-3 px-4 text-center text-emerald-400 font-bold">✓ อ่าน SOP ปิดกะ</td>
+                    <td className="py-3 px-4 text-center text-gray-500">-</td>
+                  </tr>
+                  <tr>
+                    <td className="py-3 px-4 font-bold text-rose-400">🍳 ทีมครัว (Kitchen)</td>
+                    <td className="py-3 px-4 text-center text-amber-400">✓ เฉพาะสั่งของ & ต้มซุป</td>
+                    <td className="py-3 px-4 text-center text-gray-500">-</td>
+                    <td className="py-3 px-4 text-center text-gray-500">-</td>
+                    <td className="py-3 px-4 text-center text-emerald-400 font-bold">✓ อ่านสูตร & ตรวจรับ</td>
+                    <td className="py-3 px-4 text-center text-gray-500">-</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Schedule List Cards */}
+          <div className="space-y-3">
+            <h3 className="text-base font-bold text-white">ตารางการทำงานที่บันทึกไว้ ({workflowSchedules.length})</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {workflowSchedules.map((sch) => (
+                <div key={sch.id} className="bg-slate-900 border border-white/10 rounded-2xl p-4 space-y-3">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-black text-amber-400 text-base">{sch.timeOfDay} น.</span>
+                        <span className="text-xs text-gray-400 font-mono">({sch.cronExpression})</span>
+                      </div>
+                      <h4 className="font-bold text-white text-sm mt-0.5">{sch.title}</h4>
+                    </div>
+
+                    <button
+                      onClick={() => toggleSchedule(sch.id)}
+                      className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                        sch.enabled ? 'bg-blue-500' : 'bg-gray-700'
+                      }`}
+                    >
+                      <span
+                        className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
+                          sch.enabled ? 'translate-x-4' : 'translate-x-1'
+                        }`}
+                      />
+                    </button>
+                  </div>
+
+                  <p className="text-xs text-gray-300 bg-black/30 p-2.5 rounded-xl">
+                    ⚡ {sch.targetAction}
+                  </p>
+
+                  <div className="flex items-center justify-between text-xs text-gray-400 pt-1 border-t border-white/5">
+                    <div className="flex items-center gap-1">
+                      <span>สิทธิ์:</span>
+                      {sch.allowedRoles.map((r) => getRoleBadge(r))}
+                    </div>
+
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => {
+                          setEditingSchedule(sch);
+                          setSchForm(sch);
+                          setShowScheduleModal(true);
+                        }}
+                        className="p-1 text-gray-400 hover:text-white rounded"
+                      >
+                        <Edit2 size={13} />
+                      </button>
+                      <button
+                        onClick={() => deleteSchedule(sch.id)}
+                        className="p-1 text-gray-400 hover:text-rose-400 rounded"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* TAB 3: KM & SOP KNOWLEDGE MANAGEMENT */}
+      {/* ========================================================================= */}
+      {topTab === 'km' && (
+        <div className="space-y-6">
+          {/* Header & Search */}
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-slate-900 border border-white/10 p-5 rounded-2xl">
+            <div className="flex-1 w-full max-w-md relative">
+              <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+              <input
+                type="text"
+                value={kmSearchQuery}
+                onChange={(e) => setKmSearchQuery(e.target.value)}
+                placeholder="ค้นหา SOP, คู่มือ, สูตรอาหาร, หรือ Checklist..."
+                className="w-full bg-slate-950 border border-white/15 rounded-xl pl-10 pr-4 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
+              />
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => {
+                  setEditingDoc(null);
+                  setDocForm({
+                    titleTh: '',
+                    titleEn: '',
+                    category: 'kitchen_sop',
+                    summary: '',
+                    contentMarkdown: '',
+                    tags: ['สูตรอาหาร', 'ครัว'],
+                    authorRole: 'kitchen',
+                    version: 'v1.0',
+                    linkedWorkflowIds: [],
+                    checklists: [{ id: `c-${Date.now()}`, text: 'ตรวจสอบมาตรฐานวัตถุดิบ', required: true }],
+                  });
+                  setShowDocModal(true);
+                }}
+                className="flex items-center gap-2 px-4 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-black font-black text-xs rounded-xl transition-all shadow-lg shadow-emerald-500/20"
+              >
+                <Plus size={16} />
+                <span>+ เพิ่มคู่มือ SOP / KM (New SOP)</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Category Filter Pills */}
+          <div className="flex items-center gap-2 overflow-x-auto pb-1">
+            {[
+              { id: 'all', label: 'ทั้งหมด' },
+              { id: 'procurement', label: '📦 ตรวจรับ & จัดซื้อ' },
+              { id: 'kitchen_sop', label: '🍳 สูตรอาหาร & งานครัว' },
+              { id: 'cash_handling', label: '💵 การเงิน & ปิดกะ' },
+              { id: 'operations', label: '🧹 สุขอนามัย & ความสะอาด' },
+              { id: 'finance', label: '📊 ภาษี & ระบบบัญชี' },
+            ].map((f) => (
+              <button
+                key={f.id}
+                onClick={() => setKmCategoryFilter(f.id)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
+                  kmCategoryFilter === f.id
+                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40'
+                    : 'bg-white/5 text-gray-400 hover:text-white border border-transparent'
+                }`}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Knowledge Docs Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filteredKnowledgeDocs.map((doc) => {
+              const linkedWorkflowCount = doc.linkedWorkflowIds?.length || 0;
+              return (
+                <div
+                  key={doc.id}
+                  className="bg-slate-900 border border-white/10 rounded-2xl p-5 flex flex-col justify-between hover:border-emerald-500/40 transition-all group"
+                >
+                  <div className="space-y-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <span className="px-2.5 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                        {doc.version}
+                      </span>
+                      <span className="text-xs text-gray-400 flex items-center gap-1">
+                        <Clock size={12} />
+                        {new Date(doc.updatedAt).toLocaleDateString('th-TH')}
+                      </span>
+                    </div>
+
+                    <div>
+                      <h4 className="font-bold text-white text-base leading-snug group-hover:text-emerald-300 transition-colors">
+                        {doc.titleTh}
+                      </h4>
+                      <div className="text-xs text-gray-400 mt-0.5">{doc.titleEn}</div>
+                    </div>
+
+                    <p className="text-xs text-gray-300 line-clamp-3 leading-relaxed">
+                      {doc.summary}
+                    </p>
+
+                    {/* Tag list */}
+                    <div className="flex flex-wrap gap-1.5 pt-1">
+                      {doc.tags.map((t) => (
+                        <span key={t} className="px-2 py-0.5 rounded bg-black/40 text-[10px] text-gray-400 border border-white/5">
+                          #{t}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="border-t border-white/10 mt-4 pt-3 flex items-center justify-between">
+                    <div className="text-[11px] text-gray-400">
+                      {doc.checklists?.length || 0} เช็คลิสต์ • {linkedWorkflowCount} เวิร์กโฟลว์
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setSelectedDocForView(doc)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500 hover:bg-emerald-400 text-black font-black text-xs rounded-xl transition-all shadow-md shadow-emerald-500/10"
+                      >
+                        <Eye size={12} />
+                        <span>เปิดอ่าน SOP</span>
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          setEditingDoc(doc);
+                          setDocForm(doc);
+                          setShowDocModal(true);
+                        }}
+                        className="p-1.5 text-gray-400 hover:text-white rounded-lg hover:bg-white/5"
+                      >
+                        <Edit2 size={13} />
+                      </button>
+
+                      <button
+                        onClick={() => deleteKnowledgeDoc(doc.id)}
+                        className="p-1.5 text-gray-400 hover:text-rose-400 rounded-lg hover:bg-white/5"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL 1: CREATE / EDIT WORKFLOW MODAL */}
+      {/* ========================================================================= */}
+      {showCreateWorkflowModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-white/20 rounded-3xl w-full max-w-2xl overflow-hidden shadow-2xl space-y-6 p-6 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-white/10 pb-4">
+              <div className="flex items-center gap-2">
+                <Workflow className="text-amber-400" size={24} />
+                <h3 className="text-xl font-black text-white">
+                  {editingWorkflow ? 'แก้ไขเวิร์กโฟลว์อัตโนมัติ' : 'สร้างเวิร์กโฟลว์อัตโนมัติใหม่'}
+                </h3>
+              </div>
+              <button
+                onClick={() => setShowCreateWorkflowModal(false)}
+                className="w-8 h-8 rounded-full bg-white/10 text-gray-400 hover:text-white flex items-center justify-center"
+              >
                 ✕
               </button>
             </div>
 
-            {/* Verified Supplier Badge */}
-            <div style={{ background: 'rgba(16, 185, 129, 0.15)', border: '1px solid rgba(16, 185, 129, 0.3)', padding: 10, borderRadius: 8, display: 'flex', alignItems: 'center', gap: 8, color: '#34d399', fontSize: 12, fontWeight: 700 }}>
-              <ShieldCheck size={18} />
-              <span>ผ่านการตรวจสอบ Whitelist บัญชี PromptPay ซัพพลายเออร์แล้ว</span>
-            </div>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (!wfForm.nameTh.trim()) return;
 
-            {/* Scanned QR Display */}
-            <div style={{ textAlign: 'center', background: '#fff', padding: 16, borderRadius: 12 }}>
-              <img
-                src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(selectedPOForPay.promptPayQrPayload || '')}`}
-                alt="PromptPay QR"
-                style={{ width: 180, height: 180, display: 'block', margin: '0 auto' }}
-              />
-              <div style={{ color: '#0f172a', fontWeight: 800, fontSize: 18, marginTop: 8 }}>
-                ฿{(selectedPOForPay.ocrExtractedTotal || selectedPOForPay.grandTotal).toLocaleString()}
-              </div>
-              <div style={{ color: '#475569', fontSize: 12, fontWeight: 600 }}>
-                {selectedPOForPay.supplierName} ({suppliers.find((s) => s.id === selectedPOForPay.supplierId)?.promptPayId})
-              </div>
-            </div>
-
-            <button
-              onClick={() => {
-                approveAndPayPO(selectedPOForPay.id);
-                setSelectedPOForPay(null);
+                if (editingWorkflow) {
+                  updateWorkflow({
+                    ...editingWorkflow,
+                    ...wfForm,
+                  });
+                } else {
+                  addWorkflow(wfForm);
+                }
+                setShowCreateWorkflowModal(false);
               }}
-              className="btn-primary"
-              style={{ padding: '12px', fontSize: 14, fontWeight: 800, borderRadius: 10, background: 'linear-gradient(135deg, #10b981, #059669)' }}
+              className="space-y-4"
             >
-              ✅ อนุมัติจ่ายเงิน & ปรับเพิ่มสต็อกวัตถุดิบทันที
-            </button>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs text-gray-300 font-bold block mb-1">ชื่อเวิร์กโฟลว์ (ภาษาไทย) *</label>
+                  <input
+                    type="text"
+                    required
+                    value={wfForm.nameTh}
+                    onChange={(e) => setWfForm({ ...wfForm, nameTh: e.target.value })}
+                    placeholder="เช่น แจ้งเตือนต้มน้ำซุปเช้า"
+                    className="w-full bg-slate-950 border border-white/15 rounded-xl px-3 py-2 text-sm text-white"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-300 font-bold block mb-1">Workflow Name (English)</label>
+                  <input
+                    type="text"
+                    value={wfForm.nameEn}
+                    onChange={(e) => setWfForm({ ...wfForm, nameEn: e.target.value })}
+                    placeholder="e.g. Morning Broth Alert"
+                    className="w-full bg-slate-950 border border-white/15 rounded-xl px-3 py-2 text-sm text-white"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs text-gray-300 font-bold block mb-1">หมวดหมู่ (Category)</label>
+                  <select
+                    value={wfForm.category}
+                    onChange={(e) => setWfForm({ ...wfForm, category: e.target.value as WorkflowCategory })}
+                    className="w-full bg-slate-950 border border-white/15 rounded-xl px-3 py-2 text-sm text-white"
+                  >
+                    <option value="procurement">📦 จัดซื้อ & ซัพพลายเออร์</option>
+                    <option value="finance">💰 การเงิน & ปิดกะ</option>
+                    <option value="operations">🍳 งานครัว & ปฏิบัติการ</option>
+                    <option value="inventory">📊 คลังสต็อก</option>
+                    <option value="customer">🌟 ลูกค้า & รีวิว</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-xs text-gray-300 font-bold block mb-1">ประเภททริกเกอร์ (Trigger Type)</label>
+                  <select
+                    value={wfForm.triggerType}
+                    onChange={(e) => setWfForm({ ...wfForm, triggerType: e.target.value as WorkflowTriggerType })}
+                    className="w-full bg-slate-950 border border-white/15 rounded-xl px-3 py-2 text-sm text-white"
+                  >
+                    <option value="schedule">⏱️ ตามตารางเวลา (Schedule / Cron)</option>
+                    <option value="threshold">⚠️ เมื่อสต็อกต่ำกว่าเกณฑ์ (Safety Stock)</option>
+                    <option value="event">⚡ เมื่อเกิด Event ใน POS (บิลเสร็จ/เปิดโต๊ะ)</option>
+                    <option value="manual">🖐️ สั่งรันด้วยตนเอง (Manual Trigger)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs text-gray-300 font-bold block mb-1">เงื่อนไขการทริกเกอร์ (Trigger Condition)</label>
+                <input
+                  type="text"
+                  value={wfForm.triggerCondition}
+                  onChange={(e) => setWfForm({ ...wfForm, triggerCondition: e.target.value, scheduleHuman: e.target.value })}
+                  placeholder="เช่น ทุกวันเวลา 07:00 น. หรือ เมื่อสต็อก < 10 kg"
+                  className="w-full bg-slate-950 border border-white/15 rounded-xl px-3 py-2 text-sm text-white"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs text-gray-300 font-bold block mb-1">คำอธิบายการทำงาน</label>
+                <textarea
+                  rows={2}
+                  value={wfForm.descriptionTh}
+                  onChange={(e) => setWfForm({ ...wfForm, descriptionTh: e.target.value })}
+                  placeholder="อธิบายว่าเวิร์กโฟลว์นี้ทำอะไร และส่งต่อไปยังใคร"
+                  className="w-full bg-slate-950 border border-white/15 rounded-xl px-3 py-2 text-sm text-white"
+                />
+              </div>
+
+              {/* Action Sequence Builder */}
+              <div className="bg-black/40 border border-white/10 rounded-2xl p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-amber-400 uppercase tracking-wider">
+                    ⚡ ลำดับขั้นตอนทำงาน (Action Pipeline)
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setWfForm({
+                        ...wfForm,
+                        actions: [
+                          ...wfForm.actions,
+                          {
+                            id: `act-${Date.now()}`,
+                            type: 'line_notify',
+                            title: 'แจ้งเตือนผ่าน LINE',
+                            description: 'ส่งข้อความสรุปข้อมูล',
+                            targetChannel: 'LINE Channel',
+                          },
+                        ],
+                      });
+                    }}
+                    className="text-xs text-emerald-400 hover:text-emerald-300 font-bold flex items-center gap-1"
+                  >
+                    + เพิ่ม Action
+                  </button>
+                </div>
+
+                <div className="space-y-2">
+                  {wfForm.actions.map((act, index) => (
+                    <div key={act.id || index} className="flex items-center gap-2 bg-slate-900 p-2.5 rounded-xl border border-white/5">
+                      <span className="w-5 h-5 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center text-xs font-bold">
+                        {index + 1}
+                      </span>
+                      <input
+                        type="text"
+                        value={act.title}
+                        onChange={(e) => {
+                          const newActs = [...wfForm.actions];
+                          newActs[index].title = e.target.value;
+                          setWfForm({ ...wfForm, actions: newActs });
+                        }}
+                        placeholder="ชื่อ Action"
+                        className="flex-1 bg-slate-950 border border-white/10 rounded-lg px-2.5 py-1 text-xs text-white"
+                      />
+                      <input
+                        type="text"
+                        value={act.targetChannel || ''}
+                        onChange={(e) => {
+                          const newActs = [...wfForm.actions];
+                          newActs[index].targetChannel = e.target.value;
+                          setWfForm({ ...wfForm, actions: newActs });
+                        }}
+                        placeholder="ช่องทาง เช่น LINE / KDS"
+                        className="w-32 bg-slate-950 border border-white/10 rounded-lg px-2.5 py-1 text-xs text-white"
+                      />
+                      {wfForm.actions.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setWfForm({
+                              ...wfForm,
+                              actions: wfForm.actions.filter((_, idx) => idx !== index),
+                            });
+                          }}
+                          className="text-gray-400 hover:text-rose-400 p-1"
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* RBAC & Linked SOP */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs text-gray-300 font-bold block mb-1">บทบาทที่ต้องอนุมัติ (Approver Role)</label>
+                  <select
+                    value={wfForm.approverRole || 'manager'}
+                    onChange={(e) => setWfForm({ ...wfForm, approverRole: e.target.value as StaffRole })}
+                    className="w-full bg-slate-950 border border-white/15 rounded-xl px-3 py-2 text-sm text-white"
+                  >
+                    <option value="owner">👑 Owner (เจ้าของร้าน)</option>
+                    <option value="manager">👔 Manager (ผู้จัดการ)</option>
+                    <option value="kitchen">🍳 Kitchen (หัวหน้าครัว)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-xs text-gray-300 font-bold block mb-1">เชื่อมโยงคู่มือ SOP / KM</label>
+                  <select
+                    value={wfForm.linkedSopId || ''}
+                    onChange={(e) => setWfForm({ ...wfForm, linkedSopId: e.target.value })}
+                    className="w-full bg-slate-950 border border-white/15 rounded-xl px-3 py-2 text-sm text-white"
+                  >
+                    <option value="">-- ไม่เชื่อมโยง SOP --</option>
+                    {knowledgeDocs.map((doc) => (
+                      <option key={doc.id} value={doc.id}>
+                        {doc.titleTh}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-white/10">
+                <button
+                  type="button"
+                  onClick={() => setShowCreateWorkflowModal(false)}
+                  className="px-5 py-2.5 bg-white/10 hover:bg-white/15 text-white font-bold text-sm rounded-xl transition-all"
+                >
+                  ยกเลิก
+                </button>
+                <button
+                  type="submit"
+                  className="px-6 py-2.5 bg-amber-500 hover:bg-amber-400 text-black font-black text-sm rounded-xl transition-all shadow-lg shadow-amber-500/20"
+                >
+                  {editingWorkflow ? 'บันทึกการแก้ไข' : 'สร้างเวิร์กโฟลว์'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
 
-      {/* MODAL: Create PO */}
-      {showNewPOModal && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(8px)', zIndex: 999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-          <form
-            onSubmit={handleCreatePO}
-            style={{
-              background: 'var(--color-bg-card)',
-              border: '1px solid var(--color-border)',
-              borderRadius: 16,
-              width: '100%',
-              maxWidth: 440,
-              padding: 24,
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 14,
-            }}
-          >
-            <h3 style={{ fontSize: 16, fontWeight: 800, margin: 0 }}>สร้างใบสั่งซื้อใหม่ (New PO)</h3>
-
-            <div>
-              <label style={{ fontSize: 12, fontWeight: 700, display: 'block', marginBottom: 4 }}>เลือกซัพพลายเออร์</label>
-              <select
-                value={newPoSupplierId}
-                onChange={(e) => setNewPoSupplierId(e.target.value)}
-                style={{ width: '100%', padding: '8px 12px', borderRadius: 6, background: 'var(--color-bg-elevated)', border: '1px solid var(--color-border)', color: '#fff' }}
-              >
-                {suppliers.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name} ({getChannelLabel(s.workflowConfig?.channelMethod)})
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label style={{ fontSize: 12, fontWeight: 700, display: 'block', marginBottom: 4 }}>เลือกวัตถุดิบ</label>
-              <select
-                value={newPoItemId}
-                onChange={(e) => {
-                  setNewPoItemId(e.target.value);
-                  const found = inventory.find((i) => i.id === e.target.value);
-                  if (found) setNewPoUnitPrice(found.avgCost);
-                }}
-                style={{ width: '100%', padding: '8px 12px', borderRadius: 6, background: 'var(--color-bg-elevated)', border: '1px solid var(--color-border)', color: '#fff' }}
-              >
-                {inventory.map((i) => (
-                  <option key={i.id} value={i.id}>
-                    {i.nameTh} ({i.unit})
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+      {/* ========================================================================= */}
+      {/* MODAL 2: SOP / KM VIEWER & CHECKLIST MODAL */}
+      {/* ========================================================================= */}
+      {selectedDocForView && (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-emerald-500/30 rounded-3xl w-full max-w-3xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
+            {/* Modal Header */}
+            <div className="p-6 border-b border-white/10 bg-slate-950 flex items-start justify-between gap-4">
               <div>
-                <label style={{ fontSize: 12, fontWeight: 700, display: 'block', marginBottom: 4 }}>จำนวนที่สั่ง</label>
-                <input
-                  type="number"
-                  value={newPoQty}
-                  onChange={(e) => setNewPoQty(parseFloat(e.target.value) || 0)}
-                  style={{ width: '100%', padding: '8px 12px', borderRadius: 6, background: 'var(--color-bg-elevated)', border: '1px solid var(--color-border)', color: '#fff' }}
-                />
+                <div className="flex items-center gap-2">
+                  <span className="px-2.5 py-0.5 rounded bg-emerald-500 text-black text-xs font-black">
+                    {selectedDocForView.version}
+                  </span>
+                  <span className="text-xs text-gray-400">
+                    อัปเดตล่าสุด: {new Date(selectedDocForView.updatedAt).toLocaleDateString('th-TH')}
+                  </span>
+                </div>
+                <h3 className="text-xl font-black text-white mt-1">{selectedDocForView.titleTh}</h3>
+                <div className="text-xs text-gray-400">{selectedDocForView.titleEn}</div>
               </div>
 
-              <div>
-                <label style={{ fontSize: 12, fontWeight: 700, display: 'block', marginBottom: 4 }}>ราคา / หน่วย (บาท)</label>
-                <input
-                  type="number"
-                  value={newPoUnitPrice}
-                  onChange={(e) => setNewPoUnitPrice(parseFloat(e.target.value) || 0)}
-                  style={{ width: '100%', padding: '8px 12px', borderRadius: 6, background: 'var(--color-bg-elevated)', border: '1px solid var(--color-border)', color: '#fff' }}
-                />
-              </div>
+              <button
+                onClick={() => setSelectedDocForView(null)}
+                className="w-8 h-8 rounded-full bg-white/10 text-gray-400 hover:text-white flex items-center justify-center"
+              >
+                ✕
+              </button>
             </div>
 
-            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 10 }}>
-              <button type="button" onClick={() => setShowNewPOModal(false)} className="btn-secondary" style={{ padding: '8px 14px' }}>
-                ยกเลิก
-              </button>
-              <button type="submit" className="btn-primary" style={{ padding: '8px 16px' }}>
-                บันทึกร่าง PO
+            {/* Modal Content */}
+            <div className="p-6 overflow-y-auto space-y-6 flex-1 text-gray-200">
+              {/* Summary Callout */}
+              <div className="bg-emerald-950/40 border border-emerald-500/30 p-4 rounded-2xl space-y-1">
+                <div className="text-xs font-bold text-emerald-400 uppercase tracking-wider">สรุปข้อกำหนด (Summary):</div>
+                <div className="text-sm text-emerald-100">{selectedDocForView.summary}</div>
+              </div>
+
+              {/* Markdown Guide Body */}
+              <div className="prose prose-invert max-w-none text-sm leading-relaxed whitespace-pre-line bg-black/30 p-5 rounded-2xl border border-white/5 font-sans">
+                {selectedDocForView.contentMarkdown}
+              </div>
+
+              {/* Interactive QC Checklist */}
+              {selectedDocForView.checklists && selectedDocForView.checklists.length > 0 && (
+                <div className="bg-slate-950 border border-white/10 rounded-2xl p-5 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                      <CheckSquare size={16} className="text-emerald-400" />
+                      <span>รายการตรวจรับตามมาตรฐาน (Live QC Checklist)</span>
+                    </h4>
+                    <span className="text-xs text-emerald-400 font-bold">
+                      {Object.values(checkedSopItems).filter(Boolean).length} / {selectedDocForView.checklists.length} ข้อ
+                    </span>
+                  </div>
+
+                  <div className="space-y-2">
+                    {selectedDocForView.checklists.map((ch) => {
+                      const isChecked = checkedSopItems[ch.id] || false;
+                      return (
+                        <label
+                          key={ch.id}
+                          className={`flex items-center gap-3 p-3 rounded-xl border transition-all cursor-pointer ${
+                            isChecked
+                              ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-100'
+                              : 'bg-black/20 border-white/5 text-gray-300 hover:border-white/20'
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={(e) => {
+                              setCheckedSopItems({
+                                ...checkedSopItems,
+                                [ch.id]: e.target.checked,
+                              });
+                            }}
+                            className="w-4 h-4 accent-emerald-500 rounded"
+                          />
+                          <span className={`text-xs ${isChecked ? 'line-through opacity-80' : 'font-medium'}`}>
+                            {ch.text}
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 border-t border-white/10 bg-slate-950 flex items-center justify-between">
+              <div className="text-xs text-gray-400">
+                ผู้รับผิดชอบหลัก: <span className="text-white font-bold">{selectedDocForView.authorRole}</span>
+              </div>
+              <button
+                onClick={() => setSelectedDocForView(null)}
+                className="px-6 py-2 bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-xs rounded-xl transition-all"
+              >
+                เสร็จสิ้น / ปิดหน้าต่าง
               </button>
             </div>
-          </form>
+          </div>
         </div>
       )}
 
-      {/* MODAL: Supplier Add / Edit & Procurement Workflow Config */}
-      {showSupplierModal && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(8px)', zIndex: 999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-          <form
-            onSubmit={handleSaveSupplier}
-            style={{
-              background: 'var(--color-bg-card)',
-              border: '1px solid var(--color-border)',
-              borderRadius: 16,
-              width: '100%',
-              maxWidth: 540,
-              maxHeight: '90vh',
-              overflowY: 'auto',
-              padding: 24,
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 14,
-            }}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h3 style={{ fontSize: 16, fontWeight: 800, margin: 0, color: 'var(--color-primary)' }}>
-                {editingSupplier ? `ตั้งค่าซัพพลายเออร์ & Workflow: ${editingSupplier.name}` : 'เพิ่มซัพพลายเออร์ & ตั้งค่า Workflow'}
+      {/* ========================================================================= */}
+      {/* MODAL 3: ADD / EDIT SOP DOCUMENT */}
+      {/* ========================================================================= */}
+      {showDocModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-white/20 rounded-3xl w-full max-w-2xl overflow-hidden shadow-2xl p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-white/10 pb-3">
+              <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                <BookOpen size={20} className="text-emerald-400" />
+                <span>{editingDoc ? 'แก้ไขคู่มือ SOP / KM' : 'เพิ่มคู่มือ SOP / มาตรฐานการทำงาน'}</span>
               </h3>
-              {editingSupplier && (
+              <button onClick={() => setShowDocModal(false)} className="text-gray-400 hover:text-white">✕</button>
+            </div>
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (!docForm.titleTh.trim()) return;
+
+                if (editingDoc) {
+                  updateKnowledgeDoc({
+                    ...editingDoc,
+                    ...docForm,
+                  });
+                } else {
+                  addKnowledgeDoc(docForm);
+                }
+                setShowDocModal(false);
+              }}
+              className="space-y-4"
+            >
+              <div>
+                <label className="text-xs text-gray-300 font-bold block mb-1">รหัส & ชื่อเอกสาร (ภาษาไทย) *</label>
+                <input
+                  type="text"
+                  required
+                  value={docForm.titleTh}
+                  onChange={(e) => setDocForm({ ...docForm, titleTh: e.target.value })}
+                  placeholder="เช่น SOP-KIT-02: ขั้นตอนการเตรียมเครื่องเคียง"
+                  className="w-full bg-slate-950 border border-white/15 rounded-xl px-3 py-2 text-sm text-white"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs text-gray-300 font-bold block mb-1">หมวดหมู่ (Category)</label>
+                  <select
+                    value={docForm.category}
+                    onChange={(e) => setDocForm({ ...docForm, category: e.target.value as KnowledgeCategory })}
+                    className="w-full bg-slate-950 border border-white/15 rounded-xl px-3 py-2 text-sm text-white"
+                  >
+                    <option value="procurement">📦 ตรวจรับ & จัดซื้อ</option>
+                    <option value="kitchen_sop">🍳 สูตรอาหาร & ครัว</option>
+                    <option value="cash_handling">💵 การเงิน & ปิดกะ</option>
+                    <option value="operations">🧹 สุขอนามัย & ความสะอาด</option>
+                    <option value="finance">📊 ภาษี & บัญชี</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs text-gray-300 font-bold block mb-1">เวอร์ชัน (Version)</label>
+                  <input
+                    type="text"
+                    value={docForm.version}
+                    onChange={(e) => setDocForm({ ...docForm, version: e.target.value })}
+                    className="w-full bg-slate-950 border border-white/15 rounded-xl px-3 py-2 text-sm text-white"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs text-gray-300 font-bold block mb-1">สรุปสาระสำคัญ (Summary)</label>
+                <input
+                  type="text"
+                  value={docForm.summary}
+                  onChange={(e) => setDocForm({ ...docForm, summary: e.target.value })}
+                  placeholder="สรุปสั้นๆ ให้พนักงานเข้าใจภาพรวม"
+                  className="w-full bg-slate-950 border border-white/15 rounded-xl px-3 py-2 text-sm text-white"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs text-gray-300 font-bold block mb-1">เนื้อหาคู่มือปฏิบัติงาน (Markdown Content)</label>
+                <textarea
+                  rows={5}
+                  value={docForm.contentMarkdown}
+                  onChange={(e) => setDocForm({ ...docForm, contentMarkdown: e.target.value })}
+                  placeholder="### ลำดับขั้นตอน&#10;1. ตรวจสอบอุณหภูมิ&#10;2. ชั่งน้ำหนัก..."
+                  className="w-full bg-slate-950 border border-white/15 rounded-xl px-3 py-2 text-sm text-white font-mono"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-2">
                 <button
                   type="button"
-                  onClick={() => {
-                    deleteSupplier(editingSupplier.id);
-                    setShowSupplierModal(false);
-                  }}
-                  style={{ background: 'rgba(239, 68, 68, 0.2)', border: '1px solid rgba(239, 68, 68, 0.4)', color: '#f87171', padding: '4px 8px', borderRadius: 6, cursor: 'pointer', fontSize: 11 }}
+                  onClick={() => setShowDocModal(false)}
+                  className="px-4 py-2 bg-white/10 text-white text-xs font-bold rounded-xl"
                 >
-                  <Trash2 size={13} /> ลบ
+                  ยกเลิก
                 </button>
-              )}
-            </div>
-
-            {/* Basic Info Section */}
-            <div style={{ fontSize: 12, fontWeight: 800, color: '#06b6d4', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-              1. ข้อมูลพื้นฐาน & ช่องทางติดต่อ
-            </div>
-
-            <input
-              type="text"
-              placeholder="ชื่อร้าน / บริษัทซัพพลายเออร์"
-              value={supForm.name}
-              onChange={(e) => setSupForm({ ...supForm, name: e.target.value })}
-              required
-              style={{ padding: '8px 12px', borderRadius: 6, background: 'var(--color-bg-elevated)', border: '1px solid var(--color-border)', color: '#fff' }}
-            />
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-              <input
-                type="text"
-                placeholder="ชื่อผู้ติดต่อ"
-                value={supForm.contactPerson}
-                onChange={(e) => setSupForm({ ...supForm, contactPerson: e.target.value })}
-                style={{ padding: '8px 12px', borderRadius: 6, background: 'var(--color-bg-elevated)', border: '1px solid var(--color-border)', color: '#fff' }}
-              />
-              <input
-                type="text"
-                placeholder="เบอร์โทรศัพท์"
-                value={supForm.phone}
-                onChange={(e) => setSupForm({ ...supForm, phone: e.target.value })}
-                style={{ padding: '8px 12px', borderRadius: 6, background: 'var(--color-bg-elevated)', border: '1px solid var(--color-border)', color: '#fff' }}
-              />
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-              <input
-                type="text"
-                placeholder="ชื่อ LINE Group (เช่น [LINE Group] ส่งเนื้อสด)"
-                value={supForm.lineGroup}
-                onChange={(e) => setSupForm({ ...supForm, lineGroup: e.target.value })}
-                style={{ padding: '8px 12px', borderRadius: 6, background: 'var(--color-bg-elevated)', border: '1px solid var(--color-border)', color: '#fff' }}
-              />
-              <input
-                type="text"
-                placeholder="PromptPay ID / เบอร์โทรรับเงิน"
-                value={supForm.promptPayId}
-                onChange={(e) => setSupForm({ ...supForm, promptPayId: e.target.value })}
-                style={{ padding: '8px 12px', borderRadius: 6, background: 'var(--color-bg-elevated)', border: '1px solid var(--color-border)', color: '#fff' }}
-              />
-            </div>
-
-            <hr style={{ border: 'none', borderTop: '1px solid var(--color-border)', margin: '4px 0' }} />
-
-            {/* Workflow Config Section */}
-            <div style={{ fontSize: 12, fontWeight: 800, color: '#a855f7', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: 5 }}>
-              <Settings size={14} /> 2. ตั้งค่า Procurement Workflow รายซัพพลายเออร์
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-              <div>
-                <label style={{ fontSize: 12, fontWeight: 700, display: 'block', marginBottom: 4 }}>ช่องทางสั่งซื้อ (Order Channel)</label>
-                <select
-                  value={supForm.workflowConfig?.channelMethod || 'line_group'}
-                  onChange={(e) =>
-                    setSupForm({
-                      ...supForm,
-                      workflowConfig: {
-                        ...supForm.workflowConfig!,
-                        channelMethod: e.target.value as OrderingChannelMethod,
-                      },
-                    })
-                  }
-                  style={{ width: '100%', padding: '8px 12px', borderRadius: 6, background: 'var(--color-bg-elevated)', border: '1px solid var(--color-border)', color: '#fff' }}
+                <button
+                  type="submit"
+                  className="px-5 py-2 bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-xs rounded-xl shadow-lg shadow-emerald-500/20"
                 >
-                  <option value="line_group">💬 LINE Group Chat (บอทส่งกลุ่ม)</option>
-                  <option value="line_oa">📱 LINE Official Account (แชทตรง)</option>
-                  <option value="phone">📞 โทรศัพท์สั่งตรง</option>
-                  <option value="email_pdf">📧 Email (ส่ง PDF ใบ PO)</option>
-                </select>
+                  บันทึก SOP
+                </button>
               </div>
-
-              <div>
-                <label style={{ fontSize: 12, fontWeight: 700, display: 'block', marginBottom: 4 }}>เงื่อนไขการชำระเงิน (Payment Terms)</label>
-                <select
-                  value={supForm.workflowConfig?.paymentTerm || 'promptpay_cod'}
-                  onChange={(e) =>
-                    setSupForm({
-                      ...supForm,
-                      workflowConfig: {
-                        ...supForm.workflowConfig!,
-                        paymentTerm: e.target.value as SupplierPaymentTerm,
-                      },
-                    })
-                  }
-                  style={{ width: '100%', padding: '8px 12px', borderRadius: 6, background: 'var(--color-bg-elevated)', border: '1px solid var(--color-border)', color: '#fff' }}
-                >
-                  <option value="promptpay_cod">⚡ PromptPay สแกนจ่ายทันที (COD)</option>
-                  <option value="credit_7">📅 บิลเครดิต 7 วัน</option>
-                  <option value="credit_15">📅 บิลเครดิต 15 วัน</option>
-                  <option value="credit_30">📅 บิลเครดิต 30 วัน</option>
-                  <option value="cash_drawer">💵 เงินสดเบิกลิ้นชักหน้าร้าน</option>
-                </select>
-              </div>
-            </div>
-
-            <div>
-              <label style={{ fontSize: 12, fontWeight: 700, display: 'block', marginBottom: 4 }}>
-                วงเงินอนุมัติส่ง PO อัตโนมัติ (Auto-Approve Threshold)
-              </label>
-              <input
-                type="number"
-                placeholder="เช่น 10000"
-                value={supForm.workflowConfig?.autoApproveThreshold || 5000}
-                onChange={(e) =>
-                  setSupForm({
-                    ...supForm,
-                    workflowConfig: {
-                      ...supForm.workflowConfig!,
-                      autoApproveThreshold: parseFloat(e.target.value) || 0,
-                    },
-                  })
-                }
-                style={{ width: '100%', padding: '8px 12px', borderRadius: 6, background: 'var(--color-bg-elevated)', border: '1px solid var(--color-border)', color: '#fff' }}
-              />
-              <span style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>หากยอด PO เกินวงเงินนี้ ระบบจะบังคับขอ Owner PIN ก่อนส่งสั่งซื้อ</span>
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, background: 'rgba(15, 23, 42, 0.5)', padding: 10, borderRadius: 8, border: '1px solid rgba(255, 255, 255, 0.05)' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, cursor: 'pointer' }}>
-                <input
-                  type="checkbox"
-                  checked={supForm.workflowConfig?.requireOwnerApproval || false}
-                  onChange={(e) =>
-                    setSupForm({
-                      ...supForm,
-                      workflowConfig: {
-                        ...supForm.workflowConfig!,
-                        requireOwnerApproval: e.target.checked,
-                      },
-                    })
-                  }
-                />
-                <span>🔒 บังคับให้ Owner PIN อนุมัติทุกบิล (ไม่ว่าจะกี่บาทก็ตาม)</span>
-              </label>
-
-              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, cursor: 'pointer' }}>
-                <input
-                  type="checkbox"
-                  checked={supForm.workflowConfig?.autoSendLineOnLowStock ?? true}
-                  onChange={(e) =>
-                    setSupForm({
-                      ...supForm,
-                      workflowConfig: {
-                        ...supForm.workflowConfig!,
-                        autoSendLineOnLowStock: e.target.checked,
-                      },
-                    })
-                  }
-                />
-                <span>🤖 ส่งข้อความ LINE อัตโนมัติทันทีเมื่อวัตถุดิบต่ำกว่าจุดปลอดภัย</span>
-              </label>
-
-              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, cursor: 'pointer' }}>
-                <input
-                  type="checkbox"
-                  checked={supForm.workflowConfig?.requireDeliveryProofUpload || false}
-                  onChange={(e) =>
-                    setSupForm({
-                      ...supForm,
-                      workflowConfig: {
-                        ...supForm.workflowConfig!,
-                        requireDeliveryProofUpload: e.target.checked,
-                      },
-                    })
-                  }
-                />
-                <span>📸 บังคับให้แนบรูปถ่ายใบเสร็จ / รูปส่งของ ก่อนอนุมัติจ่ายเงิน</span>
-              </label>
-            </div>
-
-            <input
-              type="text"
-              placeholder="คำแนะนำพิเศษ (เช่น ส่งก่อน 07:30 น. เท่านั้น)"
-              value={supForm.workflowConfig?.specialInstructions || ''}
-              onChange={(e) =>
-                setSupForm({
-                  ...supForm,
-                  workflowConfig: {
-                    ...supForm.workflowConfig!,
-                    specialInstructions: e.target.value,
-                  },
-                })
-              }
-              style={{ padding: '8px 12px', borderRadius: 6, background: 'var(--color-bg-elevated)', border: '1px solid var(--color-border)', color: '#fff' }}
-            />
-
-            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 10 }}>
-              <button type="button" onClick={() => setShowSupplierModal(false)} className="btn-secondary" style={{ padding: '8px 14px' }}>
-                ยกเลิก
-              </button>
-              <button type="submit" className="btn-primary" style={{ padding: '8px 16px' }}>
-                บันทึกซัพพลายเออร์ & Workflow
-              </button>
-            </div>
-          </form>
+            </form>
+          </div>
         </div>
       )}
 
-      {/* MODAL: Inventory Add / Edit */}
-      {showInventoryModal && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(8px)', zIndex: 999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-          <form
-            onSubmit={handleSaveInventory}
-            style={{
-              background: 'var(--color-bg-card)',
-              border: '1px solid var(--color-border)',
-              borderRadius: 16,
-              width: '100%',
-              maxWidth: 480,
-              padding: 24,
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 12,
-            }}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h3 style={{ fontSize: 16, fontWeight: 800, margin: 0 }}>{editingInventory ? 'แก้ไขรายการวัตถุดิบ' : 'เพิ่มวัตถุดิบใหม่'}</h3>
-              {editingInventory && (
+      {/* ========================================================================= */}
+      {/* MODAL 4: PROMPTPAY PAYMENT FOR PO MODAL */}
+      {/* ========================================================================= */}
+      {selectedPOForPay && (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-emerald-500/40 rounded-3xl w-full max-w-md overflow-hidden shadow-2xl p-6 space-y-5 text-center">
+            <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 flex items-center justify-center mx-auto">
+              <QrCode size={24} />
+            </div>
+
+            <div>
+              <h3 className="text-xl font-black text-white">ชำระเงิน PO ผ่าน PromptPay QR</h3>
+              <div className="text-xs text-gray-400 mt-1">
+                {selectedPOForPay.poNumber} • {selectedPOForPay.supplierName}
+              </div>
+            </div>
+
+            <div className="bg-white p-4 rounded-2xl inline-block shadow-inner">
+              {/* QR Mockup Canvas */}
+              <div className="w-44 h-44 bg-slate-950 flex flex-col items-center justify-center text-white text-center p-2 rounded-xl">
+                <QrCode size={96} className="text-emerald-400 animate-pulse" />
+                <div className="text-[10px] text-gray-400 mt-1 font-mono">PROMPTPAY TH</div>
+                <div className="text-xs font-bold text-white">฿{selectedPOForPay.grandTotal.toLocaleString()}</div>
+              </div>
+            </div>
+
+            <div className="bg-slate-950 p-3 rounded-xl border border-white/5 text-xs text-gray-300 space-y-1 text-left">
+              <div className="flex justify-between">
+                <span className="text-gray-400">ผู้รับเงิน:</span>
+                <span className="font-bold text-white">{selectedPOForPay.supplierName}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-400">ยอดที่ต้องชำระ:</span>
+                <span className="font-black text-emerald-400">฿{selectedPOForPay.grandTotal.toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-400">สถานะ OCR:</span>
+                <span className="text-emerald-400 font-bold">✓ Whitelist Verified</span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setSelectedPOForPay(null)}
+                className="flex-1 py-2.5 bg-white/10 hover:bg-white/15 text-white font-bold text-xs rounded-xl"
+              >
+                ยกเลิก
+              </button>
+              <button
+                onClick={() => {
+                  approveAndPayPO(selectedPOForPay.id);
+                  setSelectedPOForPay(null);
+                }}
+                className="flex-1 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-black font-black text-xs rounded-xl shadow-lg shadow-emerald-500/20"
+              >
+                ยืนยันการโอนเงิน (Pay Now)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL 5: NEW PO CREATION MODAL */}
+      {/* ========================================================================= */}
+      {showNewPOModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-white/20 rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl p-6 space-y-4">
+            <div className="flex items-center justify-between border-b border-white/10 pb-3">
+              <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                <FileText size={18} className="text-amber-400" />
+                <span>สร้างใบสั่งซื้อใหม่ (Create Purchase Order)</span>
+              </h3>
+              <button onClick={() => setShowNewPOModal(false)} className="text-gray-400 hover:text-white">✕</button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="text-xs text-gray-300 font-bold block mb-1">เลือกซัพพลายเออร์ *</label>
+                <select
+                  value={newPoSupplierId}
+                  onChange={(e) => setNewPoSupplierId(e.target.value)}
+                  className="w-full bg-slate-950 border border-white/15 rounded-xl px-3 py-2 text-sm text-white"
+                >
+                  {suppliers.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name} ({s.category})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="text-xs text-gray-300 font-bold block mb-1">เลือกวัตถุดิบ *</label>
+                <select
+                  value={newPoItemId}
+                  onChange={(e) => {
+                    setNewPoItemId(e.target.value);
+                    const item = inventory.find((i) => i.id === e.target.value);
+                    if (item) setNewPoUnitPrice(item.avgCost);
+                  }}
+                  className="w-full bg-slate-950 border border-white/15 rounded-xl px-3 py-2 text-sm text-white"
+                >
+                  {inventory.map((inv) => (
+                    <option key={inv.id} value={inv.id}>
+                      {inv.nameTh} ({inv.currentStock} {inv.unit} คงเหลือ)
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs text-gray-300 font-bold block mb-1">จำนวนที่สั่ง</label>
+                  <input
+                    type="number"
+                    min={1}
+                    value={newPoQty}
+                    onChange={(e) => setNewPoQty(Number(e.target.value))}
+                    className="w-full bg-slate-950 border border-white/15 rounded-xl px-3 py-2 text-sm text-white"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-300 font-bold block mb-1">ราคาต่อหน่วย (฿)</label>
+                  <input
+                    type="number"
+                    value={newPoUnitPrice}
+                    onChange={(e) => setNewPoUnitPrice(Number(e.target.value))}
+                    className="w-full bg-slate-950 border border-white/15 rounded-xl px-3 py-2 text-sm text-white"
+                  />
+                </div>
+              </div>
+
+              <div className="bg-black/30 p-3 rounded-xl flex items-center justify-between text-sm">
+                <span className="text-gray-400">ยอดรวมโดยประมาณ:</span>
+                <span className="font-black text-emerald-400 text-lg">฿{(newPoQty * newPoUnitPrice).toLocaleString()}</span>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowNewPOModal(false)}
+                  className="px-4 py-2 bg-white/10 text-white text-xs font-bold rounded-xl"
+                >
+                  ยกเลิก
+                </button>
                 <button
                   type="button"
                   onClick={() => {
-                    deleteInventoryItem(editingInventory.id);
-                    setShowInventoryModal(false);
+                    const selectedSup = suppliers.find((s) => s.id === newPoSupplierId) || suppliers[0];
+                    const selectedInv = inventory.find((i) => i.id === newPoItemId) || inventory[0];
+                    const total = newPoQty * newPoUnitPrice;
+                    createPurchaseOrder({
+                      supplierId: selectedSup.id,
+                      supplierName: selectedSup.name,
+                      items: [
+                        {
+                          inventoryItemId: selectedInv.id,
+                          nameTh: selectedInv.nameTh,
+                          unit: selectedInv.unit,
+                          qtyOrdered: newPoQty,
+                          unitPrice: newPoUnitPrice,
+                          total,
+                        },
+                      ],
+                      subtotal: total,
+                      grandTotal: total,
+                    });
+                    setShowNewPOModal(false);
                   }}
-                  style={{ background: 'rgba(239, 68, 68, 0.2)', border: '1px solid rgba(239, 68, 68, 0.4)', color: '#f87171', padding: '4px 8px', borderRadius: 6, cursor: 'pointer', fontSize: 11 }}
+                  className="px-5 py-2 bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs rounded-xl"
                 >
-                  <Trash2 size={13} /> ลบ
+                  สร้าง PO
                 </button>
-              )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL 6: ADD / EDIT SCHEDULE MODAL */}
+      {/* ========================================================================= */}
+      {showScheduleModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-white/20 rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl p-6 space-y-4">
+            <div className="flex items-center justify-between border-b border-white/10 pb-3">
+              <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                <Clock size={18} className="text-blue-400" />
+                <span>{editingSchedule ? 'แก้ไขตารางเวลา RBAC' : 'เพิ่มตารางเวลาทำงานใหม่'}</span>
+              </h3>
+              <button onClick={() => setShowScheduleModal(false)} className="text-gray-400 hover:text-white">✕</button>
             </div>
 
-            <input
-              type="text"
-              placeholder="ชื่อวัตถุดิบ (ภาษาไทย)"
-              value={invForm.nameTh}
-              onChange={(e) => setInvForm({ ...invForm, nameTh: e.target.value })}
-              required
-              style={{ padding: '8px 12px', borderRadius: 6, background: 'var(--color-bg-elevated)', border: '1px solid var(--color-border)', color: '#fff' }}
-            />
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (!schForm.title.trim()) return;
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-              <input
-                type="text"
-                placeholder="หน่วยนับ (เช่น kg, ขวด, Pack)"
-                value={invForm.unit}
-                onChange={(e) => setInvForm({ ...invForm, unit: e.target.value })}
-                required
-                style={{ padding: '8px 12px', borderRadius: 6, background: 'var(--color-bg-elevated)', border: '1px solid var(--color-border)', color: '#fff' }}
-              />
-              <input
-                type="number"
-                placeholder="สต็อกคงเหลือปัจจุบัน"
-                value={invForm.currentStock}
-                onChange={(e) => setInvForm({ ...invForm, currentStock: parseFloat(e.target.value) || 0 })}
-                style={{ padding: '8px 12px', borderRadius: 6, background: 'var(--color-bg-elevated)', border: '1px solid var(--color-border)', color: '#fff' }}
-              />
+                if (editingSchedule) {
+                  updateSchedule({
+                    ...editingSchedule,
+                    ...schForm,
+                  });
+                } else {
+                  addSchedule(schForm);
+                }
+                setShowScheduleModal(false);
+              }}
+              className="space-y-4"
+            >
+              <div>
+                <label className="text-xs text-gray-300 font-bold block mb-1">ชื่องาน / วัตถุประสงค์ *</label>
+                <input
+                  type="text"
+                  required
+                  value={schForm.title}
+                  onChange={(e) => setSchForm({ ...schForm, title: e.target.value })}
+                  placeholder="เช่น สรุปเงินสดปิดกะ & ตรวจผลต่าง"
+                  className="w-full bg-slate-950 border border-white/15 rounded-xl px-3 py-2 text-sm text-white"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs text-gray-300 font-bold block mb-1">เวลาทำงาน (HH:mm) *</label>
+                  <input
+                    type="time"
+                    required
+                    value={schForm.timeOfDay}
+                    onChange={(e) => setSchForm({ ...schForm, timeOfDay: e.target.value })}
+                    className="w-full bg-slate-950 border border-white/15 rounded-xl px-3 py-2 text-sm text-white"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-300 font-bold block mb-1">Cron Expression</label>
+                  <input
+                    type="text"
+                    value={schForm.cronExpression}
+                    onChange={(e) => setSchForm({ ...schForm, cronExpression: e.target.value })}
+                    placeholder="e.g. 0 8 * * *"
+                    className="w-full bg-slate-950 border border-white/15 rounded-xl px-3 py-2 text-sm text-white font-mono"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs text-gray-300 font-bold block mb-1">Action ที่ต้องทำเมื่อถึงเวลา</label>
+                <input
+                  type="text"
+                  value={schForm.targetAction}
+                  onChange={(e) => setSchForm({ ...schForm, targetAction: e.target.value })}
+                  placeholder="เช่น พิมพ์ Z-Report และส่ง Alert LINE"
+                  className="w-full bg-slate-950 border border-white/15 rounded-xl px-3 py-2 text-sm text-white"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs text-gray-300 font-bold block mb-1">ผู้อนุมัติ (Approver Role)</label>
+                <select
+                  value={schForm.approverRole}
+                  onChange={(e) => setSchForm({ ...schForm, approverRole: e.target.value as StaffRole })}
+                  className="w-full bg-slate-950 border border-white/15 rounded-xl px-3 py-2 text-sm text-white"
+                >
+                  <option value="owner">👑 Owner</option>
+                  <option value="manager">👔 Manager</option>
+                </select>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-2 border-t border-white/10">
+                <button
+                  type="button"
+                  onClick={() => setShowScheduleModal(false)}
+                  className="px-4 py-2 bg-white/10 text-white text-xs font-bold rounded-xl"
+                >
+                  ยกเลิก
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 bg-blue-500 hover:bg-blue-400 text-white font-bold text-xs rounded-xl shadow-lg shadow-blue-500/20"
+                >
+                  บันทึกตารางเวลา
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL 7: ADD / EDIT SUPPLIER MODAL */}
+      {/* ========================================================================= */}
+      {showSupplierModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-white/20 rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-white/10 pb-3">
+              <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                <Building2 size={18} className="text-emerald-400" />
+                <span>{editingSupplier ? 'แก้ไขซัพพลายเออร์' : 'เพิ่มซัพพลายเออร์ใหม่'}</span>
+              </h3>
+              <button onClick={() => setShowSupplierModal(false)} className="text-gray-400 hover:text-white">✕</button>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-              <input
-                type="number"
-                placeholder="จุดปลอดภัยขั้นต่ำ (Safety Min)"
-                value={invForm.minSafetyThreshold}
-                onChange={(e) => setInvForm({ ...invForm, minSafetyThreshold: parseFloat(e.target.value) || 0 })}
-                style={{ padding: '8px 12px', borderRadius: 6, background: 'var(--color-bg-elevated)', border: '1px solid var(--color-border)', color: '#fff' }}
-              />
-              <input
-                type="number"
-                placeholder="ต้นทุนเฉลี่ย / หน่วย (บาท)"
-                value={invForm.avgCost}
-                onChange={(e) => setInvForm({ ...invForm, avgCost: parseFloat(e.target.value) || 0 })}
-                style={{ padding: '8px 12px', borderRadius: 6, background: 'var(--color-bg-elevated)', border: '1px solid var(--color-border)', color: '#fff' }}
-              />
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (!supForm.name.trim()) return;
+
+                if (editingSupplier) {
+                  updateSupplier({
+                    ...editingSupplier,
+                    ...supForm,
+                  });
+                } else {
+                  addSupplier(supForm);
+                }
+                setShowSupplierModal(false);
+              }}
+              className="space-y-4"
+            >
+              <div>
+                <label className="text-xs text-gray-300 font-bold block mb-1">ชื่อร้านค้า / ซัพพลายเออร์ *</label>
+                <input
+                  type="text"
+                  required
+                  value={supForm.name}
+                  onChange={(e) => setSupForm({ ...supForm, name: e.target.value })}
+                  placeholder="เช่น ร้านเนื้อสด นายก้อง"
+                  className="w-full bg-slate-950 border border-white/15 rounded-xl px-3 py-2 text-sm text-white"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs text-gray-300 font-bold block mb-1">ผู้ติดต่อ</label>
+                  <input
+                    type="text"
+                    value={supForm.contactPerson}
+                    onChange={(e) => setSupForm({ ...supForm, contactPerson: e.target.value })}
+                    placeholder="เช่น คุณก้องเกียรติ"
+                    className="w-full bg-slate-950 border border-white/15 rounded-xl px-3 py-2 text-sm text-white"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-300 font-bold block mb-1">เบอร์โทรศัพท์</label>
+                  <input
+                    type="text"
+                    value={supForm.phone}
+                    onChange={(e) => setSupForm({ ...supForm, phone: e.target.value })}
+                    placeholder="081-222-3333"
+                    className="w-full bg-slate-950 border border-white/15 rounded-xl px-3 py-2 text-sm text-white"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs text-gray-300 font-bold block mb-1">PromptPay ID</label>
+                  <input
+                    type="text"
+                    value={supForm.promptPayId}
+                    onChange={(e) => setSupForm({ ...supForm, promptPayId: e.target.value })}
+                    placeholder="0812223333"
+                    className="w-full bg-slate-950 border border-white/15 rounded-xl px-3 py-2 text-sm text-white"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-300 font-bold block mb-1">ชื่อบัญชีรับเงิน</label>
+                  <input
+                    type="text"
+                    value={supForm.accountName}
+                    onChange={(e) => setSupForm({ ...supForm, accountName: e.target.value })}
+                    placeholder="นายก้องเกียรติ มั่งมี"
+                    className="w-full bg-slate-950 border border-white/15 rounded-xl px-3 py-2 text-sm text-white"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs text-gray-300 font-bold block mb-1">ชื่อกลุ่ม LINE หรือ LINE ID</label>
+                <input
+                  type="text"
+                  value={supForm.lineGroup || supForm.lineId || ''}
+                  onChange={(e) => setSupForm({ ...supForm, lineGroup: e.target.value, lineId: e.target.value })}
+                  placeholder="เช่น [LINE กลุ่ม] สั่งเนื้อสด นายก้อง"
+                  className="w-full bg-slate-950 border border-white/15 rounded-xl px-3 py-2 text-sm text-white"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-2 border-t border-white/10">
+                <button
+                  type="button"
+                  onClick={() => setShowSupplierModal(false)}
+                  className="px-4 py-2 bg-white/10 text-white text-xs font-bold rounded-xl"
+                >
+                  ยกเลิก
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-xs rounded-xl shadow-lg shadow-emerald-500/20"
+                >
+                  บันทึกซัพพลายเออร์
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL 8: ADD / EDIT INVENTORY MODAL */}
+      {/* ========================================================================= */}
+      {showInventoryModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-white/20 rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl p-6 space-y-4">
+            <div className="flex items-center justify-between border-b border-white/10 pb-3">
+              <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                <Package size={18} className="text-emerald-400" />
+                <span>{editingInventory ? 'แก้ไขรายการสต็อกวัตถุดิบ' : 'เพิ่มวัตถุดิบใหม่'}</span>
+              </h3>
+              <button onClick={() => setShowInventoryModal(false)} className="text-gray-400 hover:text-white">✕</button>
             </div>
 
-            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 10 }}>
-              <button type="button" onClick={() => setShowInventoryModal(false)} className="btn-secondary" style={{ padding: '8px 14px' }}>
-                ยกเลิก
-              </button>
-              <button type="submit" className="btn-primary" style={{ padding: '8px 16px' }}>
-                บันทึกวัตถุดิบ
-              </button>
-            </div>
-          </form>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (!invForm.nameTh.trim()) return;
+
+                if (editingInventory) {
+                  updateInventoryItem({
+                    ...editingInventory,
+                    ...invForm,
+                  });
+                } else {
+                  addInventoryItem(invForm);
+                }
+                setShowInventoryModal(false);
+              }}
+              className="space-y-4"
+            >
+              <div>
+                <label className="text-xs text-gray-300 font-bold block mb-1">ชื่อวัตถุดิบ (ภาษาไทย) *</label>
+                <input
+                  type="text"
+                  required
+                  value={invForm.nameTh}
+                  onChange={(e) => setInvForm({ ...invForm, nameTh: e.target.value })}
+                  placeholder="เช่น เนื้อน่องลายพิเศษ"
+                  className="w-full bg-slate-950 border border-white/15 rounded-xl px-3 py-2 text-sm text-white"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs text-gray-300 font-bold block mb-1">สต็อกคงเหลือปัจจุบัน</label>
+                  <input
+                    type="number"
+                    value={invForm.currentStock}
+                    onChange={(e) => setInvForm({ ...invForm, currentStock: Number(e.target.value) })}
+                    className="w-full bg-slate-950 border border-white/15 rounded-xl px-3 py-2 text-sm text-white"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-300 font-bold block mb-1">เกณฑ์เตือนสต็อกต่ำ (Min Safety)</label>
+                  <input
+                    type="number"
+                    value={invForm.minSafetyThreshold}
+                    onChange={(e) => setInvForm({ ...invForm, minSafetyThreshold: Number(e.target.value) })}
+                    className="w-full bg-slate-950 border border-white/15 rounded-xl px-3 py-2 text-sm text-white"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs text-gray-300 font-bold block mb-1">หน่วยนับ</label>
+                  <input
+                    type="text"
+                    value={invForm.unit}
+                    onChange={(e) => setInvForm({ ...invForm, unit: e.target.value })}
+                    placeholder="kg / ถุง / ลัง"
+                    className="w-full bg-slate-950 border border-white/15 rounded-xl px-3 py-2 text-sm text-white"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-300 font-bold block mb-1">ราคาต้นทุนเฉลี่ย (฿)</label>
+                  <input
+                    type="number"
+                    value={invForm.avgCost}
+                    onChange={(e) => setInvForm({ ...invForm, avgCost: Number(e.target.value) })}
+                    className="w-full bg-slate-950 border border-white/15 rounded-xl px-3 py-2 text-sm text-white"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs text-gray-300 font-bold block mb-1">ซัพพลายเออร์คู่ค้า</label>
+                <select
+                  value={invForm.supplierId}
+                  onChange={(e) => setInvForm({ ...invForm, supplierId: e.target.value })}
+                  className="w-full bg-slate-950 border border-white/15 rounded-xl px-3 py-2 text-sm text-white"
+                >
+                  {suppliers.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-2 border-t border-white/10">
+                <button
+                  type="button"
+                  onClick={() => setShowInventoryModal(false)}
+                  className="px-4 py-2 bg-white/10 text-white text-xs font-bold rounded-xl"
+                >
+                  ยกเลิก
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-xs rounded-xl shadow-lg shadow-emerald-500/20"
+                >
+                  บันทึกวัตถุดิบ
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
     </div>

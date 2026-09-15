@@ -8,7 +8,6 @@ import {
   LayoutGrid,
   BarChart3,
   Lock,
-  LogOut,
   Receipt,
   Flame,
   Menu as MenuIcon,
@@ -17,9 +16,11 @@ import {
   Clock,
   Bot,
   Key,
+  Cpu,
   Utensils,
   Users,
   Settings as SettingsIcon,
+  LogOut,
 } from 'lucide-react';
 
 // Code-split secondary views to prioritize POS Master resources first
@@ -62,6 +63,7 @@ const POSContent: React.FC = () => {
     adminSubTab,
     setAdminSubTab,
     orderQueue,
+    workerStatus,
     lastWorkerNotification,
     dismissWorkerNotification,
   } = usePOS();
@@ -321,7 +323,6 @@ const POSContent: React.FC = () => {
                       onClick={() => {
                         setAdminSubTab('settings');
                         handleTabClick('admin');
-                        setIsMenuOpen(false);
                       }}
                       className={`nav-item ${activeTab === 'admin' && adminSubTab === 'settings' ? 'active' : ''}`}
                     >
@@ -329,419 +330,340 @@ const POSContent: React.FC = () => {
                       <span>ตั้งค่าระบบ & ค่าเริ่มต้น (System Setup)</span>
                     </button>
 
+                    {/* 3. Account Permission & User Access Control */}
                     <button
                       onClick={() => {
-                        setActiveTab('admin');
-                        setAdminSubTab('menu');
-                        setIsMenuOpen(false);
+                        setAdminSubTab('employees');
+                        handleTabClick('admin');
                       }}
-                      className={`nav-item ${activeTab === 'admin' && adminSubTab === 'menu' ? 'active' : ''}`}
+                      className={`nav-item ${activeTab === 'admin' && adminSubTab === 'employees' ? 'active' : ''}`}
                     >
-                      <MenuIcon size={18} />
-                      <span>จัดการเมนู (Menu)</span>
+                      <Users size={16} style={{ color: '#38bdf8' }} />
+                      <span>จัดการพนักงาน & สิทธิ์ผู้ใช้ (User Access)</span>
                     </button>
 
+                    {/* 4. LINE AI Agent */}
                     <button
                       onClick={() => {
-                        setActiveTab('admin');
-                        setAdminSubTab('shifts');
-                        setIsMenuOpen(false);
-                      }}
-                      className={`nav-item ${activeTab === 'admin' && adminSubTab === 'shifts' ? 'active' : ''}`}
-                    >
-                      <Clock size={18} />
-                      <span>จัดการกะ (Shift)</span>
-                    </button>
-
-                    <button
-                      onClick={() => {
-                        setActiveTab('admin');
                         setAdminSubTab('procurement');
-                        setIsMenuOpen(false);
+                        handleTabClick('admin');
                       }}
                       className={`nav-item ${activeTab === 'admin' && adminSubTab === 'procurement' ? 'active' : ''}`}
                     >
-                      <Bot size={18} />
-                      <span>LINE AI สั่งวัตถุดิบ</span>
+                      <Bot size={16} style={{ color: '#06b6d4' }} />
+                      <span>จัดซื้อ & LINE Agent</span>
                     </button>
 
+                    {/* 5. Owner Dashboard */}
                     <button
                       onClick={() => {
-                        setActiveTab('admin');
                         setAdminSubTab('dashboard');
-                        setIsMenuOpen(false);
+                        handleTabClick('admin');
                       }}
                       className={`nav-item ${activeTab === 'admin' && adminSubTab === 'dashboard' ? 'active' : ''}`}
                     >
-                      <BarChart3 size={18} />
-                      <span>แดชบอร์ดสรุปยอด</span>
+                      <BarChart3 size={16} style={{ color: '#10b981' }} />
+                      <span>ภาพรวมเจ้าของร้าน (Owner Preference)</span>
                     </button>
                   </>
                 )}
 
+                {/* Divider */}
                 <div style={{ height: 1, background: 'var(--color-border)', margin: '4px 0' }} />
 
-                {/* Staff Info Card with Switch PIN & Logout */}
-                <div
-                  style={{
-                    padding: 8,
-                    borderRadius: 'var(--radius-md)',
-                    background: 'var(--color-bg-elevated)',
-                    border: '1px solid var(--color-border)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
+                {/* Staff Login in dropdown */}
+                <button
+                  onClick={() => {
+                    setActiveModal('pin');
+                    setIsMenuOpen(false);
                   }}
+                  className="nav-item"
+                  style={{ gap: 10 }}
                 >
-                  <button
-                    onClick={() => {
-                      setActiveModal('pin');
-                      setIsMenuOpen(false);
-                    }}
+                  <div
                     style={{
-                      background: 'transparent',
-                      border: 'none',
+                      width: 24,
+                      height: 24,
+                      borderRadius: '50%',
+                      background: currentStaff?.avatarColor || 'var(--color-primary)',
                       display: 'flex',
                       alignItems: 'center',
-                      gap: 8,
-                      cursor: 'pointer',
-                      textAlign: 'left',
-                      padding: 0,
+                      justifyContent: 'center',
+                      fontSize: 12,
+                      fontWeight: 700,
+                      color: '#fff',
                     }}
                   >
-                    <div
-                      style={{
-                        width: 26,
-                        height: 26,
-                        borderRadius: '50%',
-                        background: currentStaff?.avatarColor || 'var(--color-primary)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontSize: 12,
-                        fontWeight: 700,
-                        color: '#fff',
-                      }}
-                    >
-                      {currentStaff ? currentStaff.name.charAt(0) : <Lock size={10} />}
+                    {currentStaff ? currentStaff.name.charAt(0) : <Lock size={10} />}
+                  </div>
+                  <div style={{ textAlign: 'left', lineHeight: 1.2 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: '#fff' }}>
+                      {currentStaff ? currentStaff.name : 'ใส่รหัส (PIN)'}
                     </div>
-                    <div>
-                      <div style={{ fontSize: 12, fontWeight: 700, color: '#fff' }}>
-                        {currentStaff ? currentStaff.name : 'ใส่รหัส (PIN)'}
-                      </div>
-                      <div style={{ fontSize: 10, color: 'var(--color-primary)', fontWeight: 700, textTransform: 'uppercase' }}>
-                        {currentStaff?.role === 'owner' ? 'Owner' : currentStaff?.role || 'Staff'}
-                      </div>
+                    <div style={{ fontSize: 10, color: 'var(--color-primary)', fontWeight: 700, textTransform: 'uppercase' }}>
+                      {currentStaff?.role === 'owner' ? 'Owner' : currentStaff?.role || 'Staff'}
                     </div>
-                  </button>
+                  </div>
+                </button>
 
-                  {currentStaff && (
-                    <button
-                      onClick={() => {
-                        logoutStaff();
-                        setIsMenuOpen(false);
-                      }}
-                      title="ออกจากระบบ"
-                      style={{
-                        padding: '5px 8px',
-                        borderRadius: 'var(--radius-sm)',
-                        background: 'rgba(239, 68, 68, 0.15)',
-                        border: '1px solid rgba(239, 68, 68, 0.3)',
-                        color: '#f87171',
-                        fontSize: 11,
-                        fontWeight: 700,
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 4,
-                      }}
-                    >
-                      <LogOut size={13} />
-                      <span>ออก</span>
-                    </button>
-                  )}
-                </div>
+                {/* Logout Button (Last Item of Hamburger Menu) */}
+                <div style={{ height: 1, background: 'var(--color-border)', margin: '4px 0' }} />
+                <button
+                  onClick={() => {
+                    logoutStaff();
+                    setIsMenuOpen(false);
+                  }}
+                  className="nav-item"
+                  style={{
+                    gap: 10,
+                    color: '#ef4444',
+                    padding: '8px 10px',
+                    borderRadius: 8,
+                    background: 'rgba(239, 68, 68, 0.08)',
+                    border: '1px solid rgba(239, 68, 68, 0.2)',
+                    transition: 'all 0.15s ease',
+                  }}
+                >
+                  <LogOut size={16} style={{ color: '#ef4444' }} />
+                  <div style={{ textAlign: 'left', lineHeight: 1.2 }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: '#ef4444' }}>
+                      {language === 'th' ? 'ออกจากระบบ (Logout)' : 'Logout'}
+                    </div>
+                    <div style={{ fontSize: 10, color: '#f87171' }}>
+                      {currentStaff ? `ผู้ใช้: ${currentStaff.name}` : 'ล็อคเครื่อง'}
+                    </div>
+                  </div>
+                </button>
               </div>
             )}
           </div>
 
           {/* Divider */}
-          <div style={{ width: 1, height: 24, background: 'var(--color-border)', flexShrink: 0 }} />
+          <div style={{ width: 1, height: 24, background: 'rgba(255, 255, 255, 0.1)', flexShrink: 0 }} />
 
-          {/* Brand Logo & Name */}
+          {/* Restaurant Name */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
             <div
               style={{
                 width: 32,
                 height: 32,
                 minWidth: 32,
-                borderRadius: 'var(--radius-md)',
-                background: 'linear-gradient(135deg, var(--color-primary), #ea580c)',
+                borderRadius: 8,
+                background: 'linear-gradient(135deg, #f59e0b, #ea580c)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                fontSize: 16,
+                fontSize: 18,
+                boxShadow: '0 2px 8px rgba(245, 158, 11, 0.3)',
                 flexShrink: 0,
               }}
             >
               🍲
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-              <span className="brand-title" style={{ fontSize: 14, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            <div style={{ minWidth: 0 }}>
+              <h1
+                className="brand-title-text"
+                style={{
+                  fontSize: 15,
+                  fontWeight: 800,
+                  color: '#fff',
+                  margin: 0,
+                  letterSpacing: '-0.01em',
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  maxWidth: 220,
+                }}
+              >
                 {settings.restaurantNameTh}
-              </span>
-              <span style={{ fontSize: 10, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                {settings.branchName} • POS v2.0
-              </span>
+              </h1>
+              <div style={{ fontSize: 10, color: 'var(--color-text-secondary)', display: 'flex', alignItems: 'center', gap: 5, whiteSpace: 'nowrap' }}>
+                <span
+                  style={{
+                    width: 6,
+                    height: 6,
+                    borderRadius: '50%',
+                    background: 'var(--color-emerald)',
+                    boxShadow: '0 0 6px var(--color-emerald)',
+                    display: 'inline-block',
+                    flexShrink: 0,
+                  }}
+                />
+                <span>ระบบออนไลน์</span>
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Center Section: Quick navigation bar (รายการสั่ง, บิลย้อนหลัง, จัดการกะ) */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          {/* Quick Menu 1: รายการสั่ง */}
-          <button
-            onClick={() => setActiveTab('pos')}
-            className={`btn-header ${activeTab === 'pos' ? 'active' : ''}`}
+        {/* Center: Alberta Logo (Glassy & Subtle) */}
+        <div
+          className="header-center-logo"
+          style={{
+            position: 'absolute',
+            left: '50%',
+            top: '50%',
+            transform: 'translate(-50%, -50%)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            padding: '3px 10px 3px 4px',
+            background: 'rgba(255, 255, 255, 0.04)',
+            backdropFilter: 'blur(10px)',
+            border: '1px solid rgba(255, 255, 255, 0.08)',
+            borderRadius: 20,
+            pointerEvents: 'none',
+            zIndex: 1,
+          }}
+        >
+          <div
             style={{
-              padding: '6px 14px',
-              borderRadius: 'var(--radius-md)',
-              background: activeTab === 'pos' ? 'rgba(245, 158, 11, 0.2)' : 'var(--color-bg-elevated)',
-              border: `1px solid ${activeTab === 'pos' ? 'var(--color-primary)' : 'var(--color-border)'}`,
-              color: activeTab === 'pos' ? 'var(--color-primary)' : '#fff',
+              width: 24,
+              height: 24,
+              borderRadius: '50%',
+              background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.25), rgba(217, 119, 6, 0.15))',
+              border: '1px solid rgba(245, 158, 11, 0.35)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontWeight: 800,
+              fontSize: 12,
+              color: 'var(--color-primary)',
+              flexShrink: 0,
+            }}
+          >
+            A
+          </div>
+          <span
+            style={{
               fontSize: 13,
               fontWeight: 700,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6,
-              transition: 'all 0.2s ease',
+              letterSpacing: '0.06em',
+              color: 'rgba(255, 255, 255, 0.85)',
+              whiteSpace: 'nowrap',
+              textTransform: 'uppercase',
             }}
           >
-            <LayoutGrid size={16} />
-            <span>รายการสั่ง</span>
-          </button>
-
-          {/* Quick Menu 2: บิลย้อนหลัง */}
-          {(currentStaff?.role === 'owner' || currentStaff?.role === 'admin') && (
-            <button
-              onClick={() => {
-                setActiveTab('admin');
-                setAdminSubTab('bills');
-              }}
-              style={{
-                padding: '6px 14px',
-                borderRadius: 'var(--radius-md)',
-                background: activeTab === 'admin' && adminSubTab === 'bills' ? 'rgba(245, 158, 11, 0.2)' : 'var(--color-bg-elevated)',
-                border: `1px solid ${activeTab === 'admin' && adminSubTab === 'bills' ? 'var(--color-primary)' : 'var(--color-border)'}`,
-                color: activeTab === 'admin' && adminSubTab === 'bills' ? 'var(--color-primary)' : '#fff',
-                fontSize: 13,
-                fontWeight: 700,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 6,
-                transition: 'all 0.2s ease',
-              }}
-            >
-              <Receipt size={16} />
-              <span>บิลย้อนหลัง</span>
-            </button>
-          )}
-
-          {/* Quick Menu 3: จัดการกะ */}
-          {(currentStaff?.role === 'owner' || currentStaff?.role === 'admin') && (
-            <button
-              onClick={() => {
-                setActiveTab('admin');
-                setAdminSubTab('shifts');
-              }}
-              style={{
-                padding: '6px 14px',
-                borderRadius: 'var(--radius-md)',
-                background: activeTab === 'admin' && adminSubTab === 'shifts' ? 'rgba(245, 158, 11, 0.2)' : 'var(--color-bg-elevated)',
-                border: `1px solid ${activeTab === 'admin' && adminSubTab === 'shifts' ? 'var(--color-primary)' : 'var(--color-border)'}`,
-                color: activeTab === 'admin' && adminSubTab === 'shifts' ? 'var(--color-primary)' : '#fff',
-                fontSize: 13,
-                fontWeight: 700,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 6,
-                transition: 'all 0.2s ease',
-              }}
-            >
-              <Clock size={16} />
-              <span>จัดการกะ</span>
-            </button>
-          )}
-
-          {/* Quick Menu 4: จัดการระบบ (Admin System Settings) */}
-          {(currentStaff?.role === 'owner' || currentStaff?.role === 'admin') && (
-            <button
-              onClick={() => {
-                setActiveTab('admin');
-                setAdminSubTab('settings');
-              }}
-              style={{
-                padding: '6px 14px',
-                borderRadius: 'var(--radius-md)',
-                background: activeTab === 'admin' && (adminSubTab === 'settings' || adminSubTab === 'api_keys' || adminSubTab === 'employees') ? 'rgba(245, 158, 11, 0.2)' : 'var(--color-bg-elevated)',
-                border: `1px solid ${activeTab === 'admin' && (adminSubTab === 'settings' || adminSubTab === 'api_keys' || adminSubTab === 'employees') ? 'var(--color-primary)' : 'var(--color-border)'}`,
-                color: activeTab === 'admin' && (adminSubTab === 'settings' || adminSubTab === 'api_keys' || adminSubTab === 'employees') ? 'var(--color-primary)' : '#fff',
-                fontSize: 13,
-                fontWeight: 700,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 6,
-                transition: 'all 0.2s ease',
-              }}
-            >
-              <SettingsIcon size={16} />
-              <span>จัดการระบบ</span>
-            </button>
-          )}
+            PROJECT ALBERTA
+          </span>
         </div>
 
-        {/* Right Section: Order Queue Alert + Active Shift Status + Staff Profile + Logout */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
-          {/* Order Queue Alert Badge */}
-          {orderQueue.length > 0 && (
-            <button
-              onClick={() => setActiveModal('order_queue')}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 6,
-                background: 'rgba(245, 158, 11, 0.15)',
-                border: '1px solid var(--color-primary)',
-                padding: '5px 10px',
-                borderRadius: 20,
-                color: 'var(--color-primary)',
-                fontSize: 12,
-                fontWeight: 700,
-                cursor: 'pointer',
-                animation: 'pulse 1.5s infinite',
-              }}
-            >
-              <span>คิวสั่งอาหาร</span>
-              <span
-                style={{
-                  background: 'var(--color-primary)',
-                  color: '#000',
-                  borderRadius: 10,
-                  padding: '1px 6px',
-                  fontSize: 11,
-                  fontWeight: 900,
-                }}
-              >
-                {orderQueue.length}
-              </span>
-            </button>
-          )}
-
-          {/* Active Shift Indicator Button */}
+        {/* Right: Quick Shift Status + Staff Badge */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0, zIndex: 2 }}>
+          {/* Background Order Queue Worker Indicator */}
           <button
-            onClick={() => {
-              if (currentStaff?.role === 'owner' || currentStaff?.role === 'admin') {
-                setActiveTab('admin');
-                setAdminSubTab('shifts');
-              }
-            }}
+            onClick={() => setActiveModal('order_queue')}
+            title="คลิกเพื่อดูสถานะคิวออเดอร์ลูกค้าและประวัติ Background Worker"
             style={{
               display: 'flex',
               alignItems: 'center',
               gap: 6,
-              background: currentShift ? 'rgba(34, 197, 94, 0.12)' : 'rgba(239, 68, 68, 0.12)',
-              border: `1px solid ${currentShift ? 'rgba(34, 197, 94, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`,
-              padding: '5px 12px',
+              background: workerStatus === 'processing' ? 'rgba(245, 158, 11, 0.15)' : 'rgba(16, 185, 129, 0.12)',
+              border: `1px solid ${workerStatus === 'processing' ? 'rgba(245, 158, 11, 0.4)' : 'rgba(16, 185, 129, 0.35)'}`,
               borderRadius: 20,
-              cursor: currentStaff?.role === 'owner' || currentStaff?.role === 'admin' ? 'pointer' : 'default',
-              transition: 'all 0.2s',
+              padding: '5px 12px',
+              cursor: 'pointer',
+              color: workerStatus === 'processing' ? '#fbbf24' : '#34d399',
+              fontSize: 12,
+              fontWeight: 700,
+              transition: 'all 0.15s',
+              whiteSpace: 'nowrap',
             }}
           >
-            <div
+            <span
               style={{
-                width: 8,
-                height: 8,
+                width: 7,
+                height: 7,
                 borderRadius: '50%',
-                background: currentShift ? '#22c55e' : '#ef4444',
-                boxShadow: `0 0 8px ${currentShift ? '#22c55e' : '#ef4444'}`,
+                background: workerStatus === 'processing' ? '#f59e0b' : '#10b981',
+                boxShadow: `0 0 6px ${workerStatus === 'processing' ? '#f59e0b' : '#10b981'}`,
               }}
             />
-            <span style={{ fontSize: 12, fontWeight: 700, color: currentShift ? '#22c55e' : '#ef4444' }}>
-              {currentShift
-                ? `กะ #${currentShift.id.slice(-4)} (${currentShift.openedBy})`
+            <Cpu size={13} style={{ flexShrink: 0 }} />
+            <span className="quick-shift-text">
+              {workerStatus === 'processing'
+                ? 'Worker: กำลังลงบิล...'
+                : orderQueue.filter((q) => q.status === 'queued').length > 0
+                ? `คิวลูกค้า: ${orderQueue.filter((q) => q.status === 'queued').length}`
+                : 'Worker: ปกติ'}
+            </span>
+          </button>
+
+          <button
+            onClick={() => {
+              setAdminSubTab('shifts');
+              setActiveTab('pos');
+            }}
+            title="คลิกเพื่อจัดการกะและเปิด/ปิดลิ้นชักเงิน"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              background: currentShift.status === 'open' ? 'rgba(16, 185, 129, 0.12)' : 'rgba(239, 68, 68, 0.12)',
+              border: `1px solid ${currentShift.status === 'open' ? 'rgba(16, 185, 129, 0.35)' : 'rgba(239, 68, 68, 0.35)'}`,
+              borderRadius: 20,
+              padding: '5px 12px',
+              cursor: 'pointer',
+              color: currentShift.status === 'open' ? '#34d399' : '#f87171',
+              fontSize: 12,
+              fontWeight: 700,
+              transition: 'all 0.15s',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            <span
+              style={{
+                width: 7,
+                height: 7,
+                borderRadius: '50%',
+                background: currentShift.status === 'open' ? '#10b981' : '#ef4444',
+                boxShadow: currentShift.status === 'open' ? '0 0 6px #10b981' : 'none',
+                flexShrink: 0,
+              }}
+            />
+            <Clock size={13} style={{ flexShrink: 0 }} />
+            <span className="quick-shift-text">
+              {currentShift.status === 'open'
+                ? `กะ: เปิด (ทอน ฿${currentShift.openingFloat.toLocaleString()})`
                 : 'กะ: ปิด (แตะเปิด)'}
             </span>
           </button>
 
-          {/* Staff Profile & Logout */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <button
-              onClick={() => setActiveModal('pin')}
-              title={language === 'th' ? 'สลับพนักงาน (PIN)' : 'Switch Staff'}
+          <button
+            onClick={() => setActiveModal('pin')}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              background: 'var(--color-bg-elevated)',
+              border: '1px solid var(--color-border)',
+              padding: '5px 12px 5px 6px',
+              borderRadius: 20,
+              cursor: 'pointer',
+              transition: 'all 0.2s',
+              flexShrink: 0,
+            }}
+          >
+            <div
               style={{
+                width: 26,
+                height: 26,
+                borderRadius: '50%',
+                background: currentStaff?.avatarColor || 'var(--color-primary)',
                 display: 'flex',
                 alignItems: 'center',
-                gap: 8,
-                background: 'var(--color-bg-elevated)',
-                border: '1px solid var(--color-border)',
-                padding: '5px 12px 5px 6px',
-                borderRadius: 20,
-                cursor: 'pointer',
-                transition: 'all 0.2s',
+                justifyContent: 'center',
+                fontSize: 12,
+                fontWeight: 700,
+                color: '#fff',
                 flexShrink: 0,
               }}
             >
-              <div
-                style={{
-                  width: 26,
-                  height: 26,
-                  borderRadius: '50%',
-                  background: currentStaff?.avatarColor || 'var(--color-primary)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: 12,
-                  fontWeight: 700,
-                  color: '#fff',
-                  flexShrink: 0,
-                }}
-              >
-                {currentStaff ? currentStaff.name.charAt(0) : <Lock size={10} />}
-              </div>
-              <span style={{ fontSize: 12, fontWeight: 700, color: '#fff', maxWidth: 100, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {currentStaff ? currentStaff.name : 'PIN'}
-              </span>
-            </button>
-
-            {currentStaff && (
-              <button
-                onClick={() => logoutStaff()}
-                title={language === 'th' ? 'ออกจากระบบ' : 'Log Out'}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 6,
-                  padding: '5px 12px',
-                  borderRadius: 20,
-                  background: 'rgba(239, 68, 68, 0.12)',
-                  border: '1px solid rgba(239, 68, 68, 0.3)',
-                  color: '#f87171',
-                  fontSize: 12,
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  transition: 'all 0.2s ease',
-                  flexShrink: 0,
-                }}
-              >
-                <LogOut size={14} />
-                <span>{language === 'th' ? 'ออกจากระบบ' : 'Log Out'}</span>
-              </button>
-            )}
-          </div>
+              {currentStaff ? currentStaff.name.charAt(0) : <Lock size={10} />}
+            </div>
+            <span style={{ fontSize: 12, fontWeight: 700, color: '#fff', maxWidth: 100, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {currentStaff ? currentStaff.name : 'PIN'}
+            </span>
+          </button>
         </div>
       </header>
 

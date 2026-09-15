@@ -24,6 +24,9 @@ import type {
   WebhookEndpoint,
   AccountingIntegrationConfig,
   QueuedCustomerOrder,
+  AutomationWorkflow,
+  WorkflowSchedule,
+  KnowledgeDocument,
 } from '../types/pos';
 import {
   initialCategories,
@@ -42,6 +45,9 @@ import {
   initialApiKeys,
   initialWebhooks,
   initialAccountingConfig,
+  initialWorkflows,
+  initialWorkflowSchedules,
+  initialKnowledgeDocs,
 } from '../data/initialData';
 
 interface POSContextType {
@@ -160,6 +166,23 @@ interface POSContextType {
   clearCompletedQueue: () => void;
   lastWorkerNotification: { id: string; tableName: string; itemCount: number; time: string } | null;
   dismissWorkerNotification: () => void;
+
+  // Automation Workflows, RBAC Scheduling & KM
+  workflows: AutomationWorkflow[];
+  workflowSchedules: WorkflowSchedule[];
+  knowledgeDocs: KnowledgeDocument[];
+  toggleWorkflow: (id: string) => void;
+  addWorkflow: (wf: Omit<AutomationWorkflow, 'id' | 'executionCount'>) => void;
+  updateWorkflow: (wf: AutomationWorkflow) => void;
+  deleteWorkflow: (id: string) => void;
+  runWorkflowNow: (id: string) => void;
+  toggleSchedule: (id: string) => void;
+  addSchedule: (sch: Omit<WorkflowSchedule, 'id'>) => void;
+  updateSchedule: (sch: WorkflowSchedule) => void;
+  deleteSchedule: (id: string) => void;
+  addKnowledgeDoc: (doc: Omit<KnowledgeDocument, 'id' | 'updatedAt'>) => void;
+  updateKnowledgeDoc: (doc: KnowledgeDocument) => void;
+  deleteKnowledgeDoc: (id: string) => void;
 }
 
 const POSContext = createContext<POSContextType | undefined>(undefined);
@@ -1668,6 +1691,116 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setLastWorkerNotification(null);
   };
 
+  // -------------------------------------------------------------
+  // Automation Workflows, RBAC Scheduling & Knowledge Management (KM)
+  // -------------------------------------------------------------
+  const [workflows, setWorkflows] = useState<AutomationWorkflow[]>(() => {
+    const saved = localStorage.getItem(`${STORAGE_PREFIX}workflows`);
+    return saved ? JSON.parse(saved) : initialWorkflows;
+  });
+
+  const [workflowSchedules, setWorkflowSchedules] = useState<WorkflowSchedule[]>(() => {
+    const saved = localStorage.getItem(`${STORAGE_PREFIX}schedules`);
+    return saved ? JSON.parse(saved) : initialWorkflowSchedules;
+  });
+
+  const [knowledgeDocs, setKnowledgeDocs] = useState<KnowledgeDocument[]>(() => {
+    const saved = localStorage.getItem(`${STORAGE_PREFIX}knowledge_docs`);
+    return saved ? JSON.parse(saved) : initialKnowledgeDocs;
+  });
+
+  useEffect(() => {
+    localStorage.setItem(`${STORAGE_PREFIX}workflows`, JSON.stringify(workflows));
+  }, [workflows]);
+
+  useEffect(() => {
+    localStorage.setItem(`${STORAGE_PREFIX}schedules`, JSON.stringify(workflowSchedules));
+  }, [workflowSchedules]);
+
+  useEffect(() => {
+    localStorage.setItem(`${STORAGE_PREFIX}knowledge_docs`, JSON.stringify(knowledgeDocs));
+  }, [knowledgeDocs]);
+
+  const toggleWorkflow = (id: string) => {
+    setWorkflows((prev) =>
+      prev.map((wf) => (wf.id === id ? { ...wf, enabled: !wf.enabled } : wf))
+    );
+  };
+
+  const addWorkflow = (wf: Omit<AutomationWorkflow, 'id' | 'executionCount'>) => {
+    const newWf: AutomationWorkflow = {
+      ...wf,
+      id: `wf-${Date.now()}`,
+      executionCount: 0,
+      lastRunStatus: 'success',
+    };
+    setWorkflows((prev) => [newWf, ...prev]);
+  };
+
+  const updateWorkflow = (wf: AutomationWorkflow) => {
+    setWorkflows((prev) => prev.map((w) => (w.id === wf.id ? wf : w)));
+  };
+
+  const deleteWorkflow = (id: string) => {
+    setWorkflows((prev) => prev.filter((w) => w.id !== id));
+  };
+
+  const runWorkflowNow = (id: string) => {
+    setWorkflows((prev) =>
+      prev.map((w) =>
+        w.id === id
+          ? {
+              ...w,
+              lastRunAt: new Date().toISOString(),
+              lastRunStatus: 'success',
+              executionCount: w.executionCount + 1,
+            }
+          : w
+      )
+    );
+  };
+
+  const toggleSchedule = (id: string) => {
+    setWorkflowSchedules((prev) =>
+      prev.map((s) => (s.id === id ? { ...s, enabled: !s.enabled, status: !s.enabled ? 'active' : 'paused' } : s))
+    );
+  };
+
+  const addSchedule = (sch: Omit<WorkflowSchedule, 'id'>) => {
+    const newSch: WorkflowSchedule = {
+      ...sch,
+      id: `sch-${Date.now()}`,
+    };
+    setWorkflowSchedules((prev) => [...prev, newSch]);
+  };
+
+  const updateSchedule = (sch: WorkflowSchedule) => {
+    setWorkflowSchedules((prev) => prev.map((s) => (s.id === sch.id ? sch : s)));
+  };
+
+  const deleteSchedule = (id: string) => {
+    setWorkflowSchedules((prev) => prev.filter((s) => s.id !== id));
+  };
+
+  const addKnowledgeDoc = (doc: Omit<KnowledgeDocument, 'id' | 'updatedAt'>) => {
+    const newDoc: KnowledgeDocument = {
+      ...doc,
+      id: `sop-${Date.now()}`,
+      updatedAt: new Date().toISOString(),
+    };
+    setKnowledgeDocs((prev) => [newDoc, ...prev]);
+  };
+
+  const updateKnowledgeDoc = (doc: KnowledgeDocument) => {
+    setKnowledgeDocs((prev) =>
+      prev.map((d) => (d.id === doc.id ? { ...doc, updatedAt: new Date().toISOString() } : d))
+    );
+  };
+
+  const deleteKnowledgeDoc = (id: string) => {
+    setKnowledgeDocs((prev) => prev.filter((d) => d.id !== id));
+  };
+
   return (
     <POSContext.Provider
       value={{
@@ -1762,6 +1895,21 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         clearCompletedQueue,
         lastWorkerNotification,
         dismissWorkerNotification,
+        workflows,
+        workflowSchedules,
+        knowledgeDocs,
+        toggleWorkflow,
+        addWorkflow,
+        updateWorkflow,
+        deleteWorkflow,
+        runWorkflowNow,
+        toggleSchedule,
+        addSchedule,
+        updateSchedule,
+        deleteSchedule,
+        addKnowledgeDoc,
+        updateKnowledgeDoc,
+        deleteKnowledgeDoc,
       }}
     >
       {children}

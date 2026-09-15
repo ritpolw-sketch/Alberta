@@ -955,4 +955,374 @@ export const initialAccountingConfig: AccountingIntegrationConfig = {
   lastSyncedAt: '2026-09-15T12:00:00Z',
 };
 
+// -------------------------------------------------------------
+// Initial Knowledge Base (KM) Documents / SOPs
+// -------------------------------------------------------------
+export const initialKnowledgeDocs: KnowledgeDocument[] = [
+  {
+    id: 'sop-001',
+    titleTh: 'SOP-PRO-01: มาตรฐานการตรวจรับเนื้อวัวสดและชิ้นส่วนเนื้อ',
+    titleEn: 'SOP-PRO-01: Raw Beef Receiving & Quality Control Standard',
+    category: 'procurement',
+    summary: 'ขั้นตอนการตรวจสอบอุณหภูมิ สี กลิ่น และความสดของเนื้อวัวก่อนเซ็นรับ PO และชำระเงินผ่าน PromptPay QR',
+    contentMarkdown: `### วัตถุประสงค์ (Purpose)
+เพื่อให้มั่นใจว่าเนื้อสดและเนื้อน่องลายที่สั่งซื้อผ่าน LINE Agent มีคุณภาพและสุขอนามัยตามมาตรฐานร้านตุ๋นมัน พระราม 3
+
+### ขั้นตอนการปฏิบัติงาน (Standard Procedure)
+1. **ตรวจสอบเวลาการส่งมอบ**: ซัพพลายเออร์ต้องส่งมอบระหว่างเวลา 07:00 - 08:30 น. ก่อนเวลาเปิดร้าน
+2. **ตรวจวัดอุณหภูมิ**: วัดอุณหภูมิเนื้อสดในกล่องโฟมเก็บความเย็น ต้องไม่เกิน **4°C**
+3. **ตรวจสอบสภาพทางกายภาพ**:
+   - สีของเนื้อต้องแดงสด ไม่คล้ำหรือมีเมือกเหนียว
+   - กลิ่นต้องเป็นกลิ่นเนื้อธรรมชาติ ไม่มีกลิ่นเปรี้ยวหรือแอมโมเนีย
+   - เนื้อน่องลายต้องมีลวดลายเอ็นแทรกสม่ำเสมอ
+4. **การชั่งน้ำหนัก**: ชั่งน้ำหนักเนื้อทุกถุง ต้องตรงกับใบส่งของและ PO ในระบบ Alberta POS (ยอมรับความคลาดเคลื่อนได้ไม่เกิน ±1.5%)
+5. **การอนุมัติและชำระเงิน**:
+   - ผู้จัดการ/เชฟ ถ่ายรูปใบเสร็จและ QR Code ที่ได้รับจาก LINE เข้าสู่ระบบ
+   - ระบบทำการ OCR ตรวจสอบความถูกต้องและแจ้งเตือน Owner เพื่ออนุมัติ PromptPay ทันที`,
+    tags: ['จัดซื้อ', 'ตรวจรับของ', 'เนื้อวัว', 'QC', 'PromptPay'],
+    authorRole: 'owner',
+    updatedAt: '2026-09-15T10:00:00Z',
+    version: 'v2.1',
+    linkedWorkflowIds: ['wf-procurement-01'],
+    checklists: [
+      { id: 'c1', text: 'ตรวจวัดอุณหภูมิเนื้อต่ำกว่า 4°C ด้วย Food Probe Thermometer', required: true },
+      { id: 'c2', text: 'ชั่งน้ำหนักตรวจสอบความถูกต้องเทียบกับ PO', required: true },
+      { id: 'c3', text: 'ถ่ายรูปบิลส่งของและ QR Code เข้าแชท LINE กลุ่ม', required: true },
+      { id: 'c4', text: 'ย้ายเนื้อเข้าตู้แช่เย็นควบคุมอุณหภูมิ 0-2°C ภายใน 15 นาที', required: true },
+    ],
+  },
+  {
+    id: 'sop-002',
+    titleTh: 'SOP-FIN-01: ขั้นตอนการนับเงินปิดกะ & จัดการเงินสดคลาดเคลื่อน',
+    titleEn: 'SOP-FIN-01: Cash Shift Closing & Discrepancy Reconciliation',
+    category: 'cash_handling',
+    summary: 'ระเบียบปฏิบัติสำหรับแคชเชียร์และผู้จัดการในการนับเงินสดลิ้นชัก ตรวจสอบยอด PromptPay และส่งรายงานปิดกะ',
+    contentMarkdown: `### ข้อกำหนดการปิดกะ (Shift Closing Rules)
+- ต้องนับเงินสดแยกตามชนิดธนบัตรและเหรียญอย่างละเอียด
+- หากผลต่างเงินสด (Discrepancy) เกิน **฿100** ระบบจะแจ้งเตือน Owner ทันทีผ่าน LINE Automation
+
+### ลำดับขั้นตอน (Step-by-Step)
+1. กดปุ่ม **"ปิดกะ & สรุปเงิน"** ในหน้าแคชเชียร์ POS
+2. นับธนบัตร ฿1000, ฿500, ฿100, ฿50, ฿20 และเหรียญ
+3. กรอกยอดเงินสดที่นับได้จริง (Actual Cash)
+4. แยกเงินทอนสำรอง (Opening Float) สำหรับกะถัดไปจำนวน **฿3,000** ใส่ซองเงินทอน
+5. นำเงินสดส่วนเกินใส่ซองเซฟนิรภัย (Drop Safe) พร้อมลงลายมือชื่อพยาน 2 คน
+6. ระบบจะส่งสรุปยอดขายแยกช่องทาง (Cash / PromptPay / Credit Card) และภาษีมูลค่าเพิ่มเข้ากลุ่มผู้บริหารอัตโนมัติ`,
+    tags: ['การเงิน', 'ปิดกะ', 'เงินสด', 'Discrepancy', 'แคชเชียร์'],
+    authorRole: 'manager',
+    updatedAt: '2026-09-14T18:30:00Z',
+    version: 'v1.4',
+    linkedWorkflowIds: ['wf-shift-01', 'wf-accounting-01'],
+    checklists: [
+      { id: 'f1', text: 'พิมพ์ใบสรุปยอดกะ (Z-Report / Shift Summary)', required: true },
+      { id: 'f2', text: 'เก็บเงินทอนเริ่มต้น ฿3,000 ไว้อย่างถูกต้อง', required: true },
+      { id: 'f3', text: 'นำเงินสดหย่อนลงตู้เซฟและล็อคกุญแจ', required: true },
+      { id: 'f4', text: 'ตรวจสอบว่าทุกออเดอร์ใน KDS เคลียร์สถานะหมดแล้ว', required: true },
+    ],
+  },
+  {
+    id: 'sop-003',
+    titleTh: 'SOP-KIT-01: สูตรและขั้นตอนการตุ๋นน้ำซุปเนื้อวัวพรีเมียม (Batch 50L)',
+    titleEn: 'SOP-KIT-01: Premium Braised Beef Broth Standard (50L Batch)',
+    category: 'kitchen_sop',
+    summary: 'สูตรมาตรฐานเครื่องเทศ สมุนไพรจีน และลำดับการเคี่ยวน้ำซุป 6 ชั่วโมง เพื่อรักษามาตรฐานรสชาติ',
+    contentMarkdown: `### อัตราส่วนวัตถุดิบ (50L Standard Batch)
+- กระดูกวัว (เอี่ยวเล้ง/คาตั้ง): 15 kg (ลวกน้ำเดือดทิ้ง 1 ครั้ง)
+- เนื้อน่องลาย & เศษเนื้อแต่ง: 8 kg
+- เครื่องตุ๋นยาจีนสูตรเฉพาะ: 1 ชุด (อบเชย, โป๊ยกั๊ก, ชะเอม, เก๋ากี้, พริกไทยดำ)
+- ซีอิ๊วขาวพรีเมียม & น้ำตาลกรวด: ตามตารางมาตราชั่ง
+- น้ำเปล่าสะอาด: 55 ลิตร
+
+### กระบวนการตุ๋น (Cooking Timeline)
+- **06:30**: ลวกกระดูกวัวในน้ำเดือด 10 นาทีเพื่อล้างคราบไขมันและลิ่มเลือด
+- **07:00**: ตั้งหม้อตุ๋น 50L ใส่กระดูกวัว เครื่องเทศ และเปิดไฟแรงจนเดือด
+- **07:30**: ช้อนฟองออกให้หมด หรี่ไฟเบาคงที่อุณหภูมิ 88-92°C
+- **11:00**: วัดค่าความหวาน (Brix) และความเค็ม (Salinity Sensor)`,
+    tags: ['สูตรอาหาร', 'ครัว', 'ต้มซุป', 'ตุ๋นเนื้อ', 'KDS'],
+    authorRole: 'kitchen',
+    updatedAt: '2026-09-12T08:00:00Z',
+    version: 'v3.0',
+    linkedWorkflowIds: ['wf-kitchen-prep-01'],
+    checklists: [
+      { id: 'k1', text: 'ลวกกระดูกวัวล้างคราบเลือดก่อนลงหม้อตุ๋นจริง', required: true },
+      { id: 'k2', text: 'ตรวจวัดอุณหภูมิหม้อตุ๋นคงที่ 90°C', required: true },
+      { id: 'k3', text: 'ช้อนฟองและไขมันส่วนเกินออกทุก 45 นาที', required: true },
+    ],
+  },
+  {
+    id: 'sop-004',
+    titleTh: 'SOP-ACC-01: คู่มือการตรวจสอบยอดภาษีขาย & เชื่อมต่อ FlowAccount / PEAK',
+    titleEn: 'SOP-ACC-01: Daily Tax & Cloud Accounting Auto-Sync Guideline',
+    category: 'finance',
+    summary: 'แนวทางการทำงานของระบบซิงค์บัญชีอัตโนมัติ การส่งรายงานภาษีซื้อ-ภาษีขาย (ภ.พ.30) และการจัดการ Webhook',
+    contentMarkdown: `### การทำงานของระบบอัตโนมัติ (Integration Workflow)
+ระบบ Alberta POS จะทำการรวบรวมข้อมูลยอดขาย รายการยกเลิกบิล และใบสั่งซื้อซัพพลายเออร์ที่จ่ายแล้ว จากนั้นส่งผ่าน REST API ไปยังโปรแกรมบัญชีคลาวด์ทุกวันเวลา 23:45 น.
+
+### การตรวจสอบความถูกต้อง
+1. ตรวจสอบสถานะ Webhook ในเมนู **API Key & บัญชี**
+2. บัญชีรายได้จะบันทึกเข้าผังบัญชี \`4100\` และต้นทุนวัตถุดิบบันทึกเข้าผัง \`5100\`
+3. รายงานภาษีขายสามารถ Export เป็นไฟล์ Excel ตามฟอร์แมตกรมสรรพากรได้ทันที`,
+    tags: ['บัญชี', 'ภาษี', 'VAT 7%', 'FlowAccount', 'PEAK'],
+    authorRole: 'admin',
+    updatedAt: '2026-09-10T15:00:00Z',
+    version: 'v1.2',
+    linkedWorkflowIds: ['wf-accounting-01'],
+  },
+  {
+    id: 'sop-005',
+    titleTh: 'SOP-OPS-01: มาตรฐานสุขอนามัยและการล้างทำความสะอาดร้านประจำสัปดาห์',
+    titleEn: 'SOP-OPS-01: Weekly Restaurant Sanitation & Equipment Maintenance',
+    category: 'operations',
+    summary: 'ตารางการตรวจเช็คระบบดูดควัน ล้างดักไขมัน และทำความสะอาดตู้เย็นแช่เนื้อทุกวันจันทร์',
+    contentMarkdown: `### รายการทำความสะอาดประจำสัปดาห์ (Weekly Hygiene Standard)
+- ถอดล้างแผ่นกรองฮูดดูดควันในครัวด้วยน้ำยาขจัดคราบมัน
+- ตักไขมันจากถังดักไขมัน (Grease Trap) ใส่ถุงดำและใส่น้ำยาล้างท่อป้องกันการอุดตัน
+- ละลายน้ำแข็งและเช็ดทำความสะอาดตู้แช่แข็งเนื้อสดด้วยน้ำยาฆ่าเชื้อเกรดอาหาร (Food Grade Sanitizer)
+- ตรวจเช็คสต็อกน้ำยาทำความสะอาดและกระดาษพิมพ์ใบเสร็จสำรอง`,
+    tags: ['สุขอนามัย', 'ทำความสะอาด', 'ครัว', 'บำรุงรักษา'],
+    authorRole: 'manager',
+    updatedAt: '2026-09-08T09:00:00Z',
+    version: 'v1.0',
+    linkedWorkflowIds: ['wf-maintenance-01'],
+    checklists: [
+      { id: 'm1', text: 'ล้างถังดักไขมันและลงบันทึกในสมุดตรวจสุขอนามัย', required: true },
+      { id: 'm2', text: 'ตรวจเช็คอุณหภูมิดิจิทัลของตู้เย็นทุกตู้', required: true },
+      { id: 'm3', text: 'ส่งรูปถ่ายการทำความสะอาดเข้ากลุ่ม LINE ผู้จัดการ', required: true },
+    ],
+  },
+];
+
+// -------------------------------------------------------------
+// Initial Automation Workflows (Procurement is a core featured workflow)
+// -------------------------------------------------------------
+export const initialWorkflows: AutomationWorkflow[] = [
+  {
+    id: 'wf-procurement-01',
+    nameTh: 'ระบบจัดซื้อ & สั่งของผ่าน LINE อัตโนมัติ (LINE Procurement & Auto-PO)',
+    nameEn: 'Autonomous LINE Procurement & Supplier Auto-PO Agent',
+    category: 'procurement',
+    descriptionTh: 'ตรวจสอบสต็อกคงเหลือ หากต่ำกว่า Min Safety Stock จะสร้าง PO และส่งเข้า LINE ซัพพลายเออร์ทันที พร้อมรับบิลและอ่าน Slip QR อัตโนมัติ',
+    descriptionEn: 'Monitors inventory levels, auto-generates purchase orders on low stock, notifies LINE groups, and verifies supplier slips via OCR.',
+    icon: 'Bot',
+    enabled: true,
+    triggerType: 'threshold',
+    triggerCondition: 'เมื่อสต็อกวัตถุดิบ < Min Safety Level หรือสร้างคำสั่งซื้อด่วน',
+    actions: [
+      { id: 'act-1', type: 'create_po', title: 'สร้างใบสั่งซื้อ PO', description: 'คำนวณจำนวนที่ต้องสั่งและจับคู่ซัพพลายเออร์ที่ลงทะเบียนไว้' },
+      { id: 'act-2', type: 'line_notify', title: 'ส่งใบสั่งซื้อเข้า LINE กลุ่ม', description: 'แจ้งเตือนร้านค้าซัพพลายเออร์พร้อมรายละเอียดและเวลาส่ง', targetChannel: 'LINE Group' },
+      { id: 'act-3', type: 'webhook_call', title: 'รอรับสลิป & ตรวจสอบ OCR', description: 'ถอดรหัส PromptPay QR และตรวจสอบเลขบัญชี White-list' },
+    ],
+    allowedRoles: ['owner', 'manager', 'kitchen'],
+    approverRole: 'owner',
+    scheduleHuman: 'ทำงานแบบ Real-time ตามระดับสต็อก & สั่งทันที',
+    linkedSopId: 'sop-001',
+    lastRunAt: '2026-09-15T09:35:00Z',
+    lastRunStatus: 'success',
+    executionCount: 28,
+    isSpecialProcurement: true,
+  },
+  {
+    id: 'wf-shift-01',
+    nameTh: 'สรุปยอดเงินสดปิดกะ & แจ้งเตือนเงินคลาดเคลื่อน (Cash Shift Reconcile)',
+    nameEn: 'End-of-Day Cash Reconciliation & Shift Close Agent',
+    category: 'finance',
+    descriptionTh: 'ตรวจสอบยอดเงินสดนับจริงเทียบยอดคำนวณ หากคลาดเคลื่อนเกิน ฿100 จะส่งแจ้งเตือนด่วนไปยังเจ้าของร้าน พร้อมบันทึกหลักฐาน',
+    descriptionEn: 'Compares drawer actual cash against POS transactions, flags discrepancies over ฿100, and sends instant alert to Owner.',
+    icon: 'Wallet',
+    enabled: true,
+    triggerType: 'schedule',
+    triggerCondition: 'เมื่อแคชเชียร์ทำการปิดกะ หรือ ทุกวันเวลา 22:30 น.',
+    actions: [
+      { id: 'act-4', type: 'print_ticket', title: 'พิมพ์ใบสรุปกะอัตโนมัติ', description: 'สั่งพิมพ์ Shift Summary ออกเครื่องพิมพ์ความร้อนแคชเชียร์' },
+      { id: 'act-5', type: 'line_notify', title: 'ส่งสรุปยอดขายเข้า LINE ผู้บริหาร', description: 'สรุปยอดเงินสด, PromptPay, บัตรเครดิต และผลต่างเงินทอน', targetChannel: 'LINE Owner Channel' },
+    ],
+    allowedRoles: ['owner', 'manager', 'cashier'],
+    approverRole: 'manager',
+    scheduleCron: '30 22 * * *',
+    scheduleHuman: 'ทุกวัน เวลา 22:30 น.',
+    linkedSopId: 'sop-002',
+    lastRunAt: '2026-09-14T22:30:12Z',
+    lastRunStatus: 'success',
+    executionCount: 45,
+  },
+  {
+    id: 'wf-kitchen-prep-01',
+    nameTh: 'แจ้งเตือนเตรียมวัตถุดิบ & เคี่ยวน้ำซุปรอบเช้า (Morning Prep Batch Alert)',
+    nameEn: 'Morning Kitchen Prep & Broth Simmering Batch Reminder',
+    category: 'operations',
+    descriptionTh: 'ส่งสัญญาณเข้าจอครัว KDS และแท็บเล็ตครัวตอน 07:00 น. เพื่อให้ทีมครัวเริ่มลวกกระดูกและตั้งหม้อตุ๋น 50L ตามมาตรฐาน SOP',
+    descriptionEn: 'Triggers KDS alerts and sends batch checklist to kitchen station every morning at 07:00 AM.',
+    icon: 'Flame',
+    enabled: true,
+    triggerType: 'schedule',
+    triggerCondition: 'ทุกวัน เวลา 07:00 น. ก่อนเปิดร้าน',
+    actions: [
+      { id: 'act-6', type: 'kds_alert', title: 'ส่ง Alert เข้าจอครัว KDS', description: 'ขึ้นการ์ดภารกิจต้มน้ำซุปและหมักเนื้อในจอ KDS ประจำสถานีต้ม' },
+      { id: 'act-7', type: 'line_notify', title: 'แจ้งเตือนเชฟผ่าน LINE', description: 'ส่งลิงก์ SOP-KIT-01 พร้อม Checklist วัตถุดิบ', targetChannel: 'LINE Kitchen Group' },
+    ],
+    allowedRoles: ['owner', 'manager', 'kitchen'],
+    approverRole: 'manager',
+    scheduleCron: '0 7 * * *',
+    scheduleHuman: 'ทุกวัน เวลา 07:00 น.',
+    linkedSopId: 'sop-003',
+    lastRunAt: '2026-09-15T07:00:00Z',
+    lastRunStatus: 'success',
+    executionCount: 62,
+  },
+  {
+    id: 'wf-accounting-01',
+    nameTh: 'ส่งสรุปยอดขาย & ภาษีเข้า FlowAccount / PEAK (Cloud Accounting Sync)',
+    nameEn: 'Daily Automated Cloud Accounting & Tax Sync',
+    category: 'finance',
+    descriptionTh: 'รวบรวมยอดขายประจำวัน รายการค่าใช้จ่าย PO ที่ชำระแล้ว และภาษีมูลค่าเพิ่ม แล้วยิง API เชื่อมต่อโปรแกรมบัญชีอัตโนมัติ',
+    descriptionEn: 'Aggregates daily sales, paid POs, and VAT, then invokes accounting webhook/API connector at midnight.',
+    icon: 'Database',
+    enabled: true,
+    triggerType: 'schedule',
+    triggerCondition: 'ทุกวัน เวลา 23:45 น. หลังร้านปิดและเคลียร์บิลหมด',
+    actions: [
+      { id: 'act-8', type: 'sync_accounting', title: 'Sync ยอดขายเข้า FlowAccount', description: 'บันทึกเดบิตเงินสด/พร้อมเพย์ เครดิตรายได้ 4100 และภาษีขาย 2130' },
+      { id: 'act-9', type: 'webhook_call', title: 'ส่ง Webhook Event', description: 'แจ้งเตือนระบบ ERP ภายนอกเพื่อสร้างใบกำกับภาษีอย่างย่อรวม' },
+    ],
+    allowedRoles: ['owner', 'admin'],
+    approverRole: 'owner',
+    scheduleCron: '45 23 * * *',
+    scheduleHuman: 'ทุกวัน เวลา 23:45 น.',
+    linkedSopId: 'sop-004',
+    lastRunAt: '2026-09-14T23:45:00Z',
+    lastRunStatus: 'success',
+    executionCount: 19,
+  },
+  {
+    id: 'wf-customer-survey-01',
+    nameTh: 'ส่ง QR แบบประเมินความพึงพอใจลูกค้า (Customer Feedback QR)',
+    nameEn: 'Automated Post-Payment Customer Satisfaction Survey',
+    category: 'customer',
+    descriptionTh: 'เมื่อลูกค้าชำระเงินเกิน ฿300 ระบบจะพิมพ์ QR ท้ายใบเสร็จให้ลูกค้าสแกนรีวิวความอร่อยเพื่อรับส่วนลด 10% ในครั้งถัดไป',
+    descriptionEn: 'Appends promotional feedback QR code to customer receipts for orders above ฿300 to gather instant NPS score.',
+    icon: 'Smile',
+    enabled: true,
+    triggerType: 'event',
+    triggerCondition: 'เมื่อบิลชำระเงินเสร็จสิ้น และยอดรวมเกิน ฿300',
+    actions: [
+      { id: 'act-10', type: 'print_ticket', title: 'แทรก Dynamic QR ท้ายใบเสร็จ', description: 'สร้างโค้ดส่วนลดแบบ 1-Time Coupon สำหรับการรีวิว' },
+    ],
+    allowedRoles: ['owner', 'manager'],
+    scheduleHuman: 'ทำงานอัตโนมัติทุกครั้งที่พิมพ์ใบเสร็จ',
+    lastRunAt: '2026-09-15T12:15:00Z',
+    lastRunStatus: 'success',
+    executionCount: 114,
+  },
+  {
+    id: 'wf-maintenance-01',
+    nameTh: 'แจ้งเตือนบำรุงรักษาอุปกรณ์ & ล้างดักไขมัน (Weekly Maintenance Schedule)',
+    nameEn: 'Weekly Preventive Maintenance & Hygiene Schedule',
+    category: 'operations',
+    descriptionTh: 'เตือนรอบทำความสะอาดใหญ่ประจำสัปดาห์ ล้างแผ่นกรองควัน ตรวจเช็คน้ำยา และล้างถังดักไขมันเพื่อความสะอาดสูงสุด',
+    descriptionEn: 'Weekly hygiene checklist reminder sent to operations staff every Monday morning.',
+    icon: 'Wrench',
+    enabled: true,
+    triggerType: 'schedule',
+    triggerCondition: 'ทุกวันจันทร์ เวลา 09:00 น.',
+    actions: [
+      { id: 'act-11', type: 'line_notify', title: 'ส่ง Checklist การทำความสะอาด', description: 'แนบ SOP-OPS-01 พร้อมฟอร์มส่งรูปถ่ายตรวจรับ', targetChannel: 'LINE Manager Group' },
+    ],
+    allowedRoles: ['owner', 'manager', 'kitchen'],
+    approverRole: 'manager',
+    scheduleCron: '0 9 * * 1',
+    scheduleHuman: 'ทุกวันจันทร์ เวลา 09:00 น.',
+    linkedSopId: 'sop-005',
+    lastRunAt: '2026-09-14T09:00:00Z',
+    lastRunStatus: 'success',
+    executionCount: 12,
+  },
+];
+
+// -------------------------------------------------------------
+// Initial RBAC Schedules
+// -------------------------------------------------------------
+export const initialWorkflowSchedules: WorkflowSchedule[] = [
+  {
+    id: 'sch-1',
+    workflowId: 'wf-kitchen-prep-01',
+    title: 'ต้มน้ำซุป & ละลายเนื้อสดรอบเช้า (07:00)',
+    timeOfDay: '07:00',
+    daysOfWeek: [0, 1, 2, 3, 4, 5, 6], // ทุกวัน
+    cronExpression: '0 7 * * *',
+    enabled: true,
+    targetAction: 'ส่ง KDS Alert ไปสถานีต้มซุป & ส่ง LINE ถึงเชฟใหญ่',
+    allowedRoles: ['kitchen', 'manager', 'owner'],
+    requireApproval: false,
+    approverRole: 'manager',
+    lastRun: '2026-09-15 07:00',
+    nextRun: '2026-09-16 07:00',
+    status: 'active',
+  },
+  {
+    id: 'sch-2',
+    workflowId: 'wf-procurement-01',
+    title: 'สแกนสต็อกวัตถุดิบและเตือนสั่งของรอบบ่าย (14:00)',
+    timeOfDay: '14:00',
+    daysOfWeek: [1, 2, 3, 4, 5, 6], // จันทร์-เสาร์
+    cronExpression: '0 14 * * 1-6',
+    enabled: true,
+    targetAction: 'ตรวจจับรายการสต็อก < Min Safety และร่าง PO ส่ง Owner อนุมัติ',
+    allowedRoles: ['manager', 'owner'],
+    requireApproval: true,
+    approverRole: 'owner',
+    lastRun: '2026-09-15 14:00',
+    nextRun: '2026-09-16 14:00',
+    status: 'active',
+  },
+  {
+    id: 'sch-3',
+    workflowId: 'wf-shift-01',
+    title: 'สรุปยอดเงินสดปิดกะและตรวจสอบผลต่าง (22:30)',
+    timeOfDay: '22:30',
+    daysOfWeek: [0, 1, 2, 3, 4, 5, 6], // ทุกวัน
+    cronExpression: '30 22 * * *',
+    enabled: true,
+    targetAction: 'พิมพ์ Z-Report ปิดกะ และส่ง Alert LINE เมื่อเงินขาดเกิน ฿100',
+    allowedRoles: ['cashier', 'manager', 'owner'],
+    requireApproval: true,
+    approverRole: 'owner',
+    lastRun: '2026-09-14 22:30',
+    nextRun: '2026-09-15 22:30',
+    status: 'active',
+  },
+  {
+    id: 'sch-4',
+    workflowId: 'wf-accounting-01',
+    title: 'ซิงค์บัญชีและภาษีเข้า FlowAccount อัตโนมัติ (23:45)',
+    timeOfDay: '23:45',
+    daysOfWeek: [0, 1, 2, 3, 4, 5, 6], // ทุกวัน
+    cronExpression: '45 23 * * *',
+    enabled: true,
+    targetAction: 'รวบรวม Daily Sales & COGS แล้วยิง Webhook เข้า FlowAccount',
+    allowedRoles: ['admin', 'owner'],
+    requireApproval: false,
+    approverRole: 'owner',
+    lastRun: '2026-09-14 23:45',
+    nextRun: '2026-09-15 23:45',
+    status: 'active',
+  },
+  {
+    id: 'sch-5',
+    workflowId: 'wf-maintenance-01',
+    title: 'ตรวจสุขอนามัยและล้างดักไขมันประจำสัปดาห์ (จันทร์ 09:00)',
+    timeOfDay: '09:00',
+    daysOfWeek: [1], // เฉพาะวันจันทร์
+    cronExpression: '0 9 * * 1',
+    enabled: true,
+    targetAction: 'ส่ง Checklist ล้างบ่อดักไขมันเข้า LINE ผู้จัดการ',
+    allowedRoles: ['manager', 'kitchen', 'owner'],
+    requireApproval: false,
+    approverRole: 'manager',
+    lastRun: '2026-09-14 09:00',
+    nextRun: '2026-09-21 09:00',
+    status: 'active',
+  },
+];
+
+
 

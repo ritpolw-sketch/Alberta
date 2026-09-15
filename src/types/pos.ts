@@ -304,7 +304,7 @@ export interface WorkflowSchedule {
   status: 'active' | 'paused' | 'running';
 }
 
-export type KnowledgeCategory = 'procurement' | 'kitchen_sop' | 'cash_handling' | 'service_sop' | 'emergency' | 'ai_prompts';
+export type KnowledgeCategory = 'procurement' | 'kitchen_sop' | 'cash_handling' | 'service_sop' | 'emergency' | 'ai_prompts' | 'operations' | 'finance';
 
 export interface KnowledgeChecklistItem {
   id: string;

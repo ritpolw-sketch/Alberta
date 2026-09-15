@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { usePOS } from '../../context/POSContext';
-import { Lock, Delete, X, AlertCircle, LogOut } from 'lucide-react';
+import { Lock, Delete, X, AlertCircle } from 'lucide-react';
 
 interface PinPadModalProps {
   isOpen: boolean;
@@ -17,7 +17,7 @@ export const PinPadModal: React.FC<PinPadModalProps> = ({
   title,
   onSuccess,
 }) => {
-  const { staffUsers, loginWithPin, logoutStaff, currentStaff, language } = usePOS();
+  const { staffUsers, loginWithPin, language } = usePOS();
   const [pin, setPin] = useState('');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -113,70 +113,6 @@ export const PinPadModal: React.FC<PinPadModalProps> = ({
             ? 'กดรหัส 4 หลักเพื่อเข้าสู่ระบบหรือยืนยันสิทธิ์'
             : 'Enter 4-digit PIN to switch staff or authenticate'}
         </p>
-
-        {/* Current logged in user summary & logout option */}
-        {currentStaff && (
-          <div
-            style={{
-              marginBottom: 16,
-              padding: '10px 14px',
-              borderRadius: 'var(--radius-md)',
-              background: 'var(--color-bg-elevated)',
-              border: '1px solid var(--color-border)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <div
-                style={{
-                  width: 28,
-                  height: 28,
-                  borderRadius: '50%',
-                  background: currentStaff.avatarColor || 'var(--color-primary)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: 12,
-                  fontWeight: 700,
-                  color: '#fff',
-                }}
-              >
-                {currentStaff.name.charAt(0)}
-              </div>
-              <div style={{ textAlign: 'left' }}>
-                <div style={{ fontSize: 13, fontWeight: 700, color: '#fff' }}>{currentStaff.name}</div>
-                <div style={{ fontSize: 10, color: 'var(--color-text-secondary)', textTransform: 'capitalize' }}>
-                  {currentStaff.role}
-                </div>
-              </div>
-            </div>
-
-            <button
-              onClick={() => {
-                logoutStaff();
-                if (onClose) onClose();
-              }}
-              style={{
-                padding: '6px 10px',
-                borderRadius: 'var(--radius-sm)',
-                background: 'rgba(239, 68, 68, 0.15)',
-                border: '1px solid rgba(239, 68, 68, 0.3)',
-                color: '#f87171',
-                fontSize: 11,
-                fontWeight: 700,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 4,
-              }}
-            >
-              <LogOut size={13} />
-              <span>{language === 'th' ? 'ออกจากระบบ' : 'Log Out'}</span>
-            </button>
-          </div>
-        )}
 
         {/* PIN Indicators */}
         <div style={{ display: 'flex', justifyContent: 'center', gap: 16, marginBottom: 24 }}>
