@@ -1613,7 +1613,7 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }, 380);
 
     return () => clearTimeout(timer);
-  }, [orderQueue, tables, settings]);
+  }, [orderQueue, tables, settings, calculateOrderTotals]);
 
   const queueCustomerOrder = async (
     orderData: Omit<QueuedCustomerOrder, 'id' | 'submittedAt' | 'status'>

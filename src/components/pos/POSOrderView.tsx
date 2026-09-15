@@ -4,9 +4,9 @@ import { TableMap } from './TableMap';
 import { OrderPanel } from './OrderPanel';
 import { MenuCatalog } from './MenuCatalog';
 import {
-  Users,
   Receipt,
-  LayoutGrid,
+  History,
+  Clock,
 } from 'lucide-react';
 import type { MenuItem } from '../../types/pos';
 
@@ -34,6 +34,10 @@ export const POSOrderView: React.FC = () => {
     setSelectedItemForModifier,
     setActiveModal,
     language,
+    activeTab,
+    setActiveTab,
+    adminSubTab,
+    setAdminSubTab,
   } = usePOS();
 
   const [flyingItems, setFlyingItems] = useState<FlyingItem[]>([]);
@@ -50,9 +54,6 @@ export const POSOrderView: React.FC = () => {
   }, [tables, activeTableId, orders, setActiveTableId]);
 
   const activeTable = tables.find((t) => t.id === activeTableId);
-  const activeOrder = activeTableId
-    ? Object.values(orders).find((o) => o.tableId === activeTableId && o.status === 'active')
-    : null;
 
   const handleCustomizeItem = (item: MenuItem) => {
     setSelectedItemForModifier(item);
@@ -190,77 +191,112 @@ export const POSOrderView: React.FC = () => {
         </div>
       ))}
 
-      {/* Minimal Active Table Status Bar */}
+      {/* Quick Navigation Bar: รายการสั่ง, บิลย้อนหลัง, จัดการกะ */}
       <div
         style={{
-          padding: '6px 16px',
+          padding: '6px 14px',
           background: 'var(--color-bg-card)',
           borderBottom: '1px solid var(--color-border)',
           display: 'flex',
           alignItems: 'center',
-          gap: 12,
+          justifyContent: 'space-between',
+          gap: 10,
           zIndex: 10,
-          minHeight: 38,
+          minHeight: 40,
         }}
       >
-        {activeTable ? (
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-              background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.22), rgba(217, 119, 6, 0.12))',
-              border: '1.5px solid var(--color-primary)',
-              borderRadius: 8,
-              padding: '3px 10px',
-            }}
-          >
-            <span style={{ fontSize: 13, fontWeight: 900, color: 'var(--color-primary)' }}>
-              {language === 'th' ? `กำลังสั่ง: โต๊ะ ${activeTable.number}` : `Active: Table ${activeTable.number}`}
-            </span>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 11, color: 'var(--color-text-secondary)' }}>
-              <Users size={12} />
-              <span>{activeTable.capacity} {language === 'th' ? 'ที่นั่ง' : 'seats'}</span>
-            </div>
-          </div>
-        ) : (
-          <div
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {/* 1. รายการสั่ง */}
+          <button
+            onClick={() => setActiveTab('pos')}
             style={{
               display: 'flex',
               alignItems: 'center',
               gap: 6,
-              padding: '3px 10px',
+              padding: '6px 14px',
               borderRadius: 8,
-              background: 'rgba(255, 255, 255, 0.06)',
-              border: '1px solid var(--color-border)',
-              fontSize: 12,
-              color: 'var(--color-text-secondary)',
+              border: activeTab === 'pos' ? '1px solid rgba(245, 158, 11, 0.4)' : '1px solid var(--color-border)',
+              background: activeTab === 'pos' ? 'linear-gradient(135deg, rgba(245, 158, 11, 0.2), rgba(217, 119, 6, 0.1))' : 'rgba(255, 255, 255, 0.04)',
+              color: activeTab === 'pos' ? 'var(--color-primary)' : 'var(--color-text-secondary)',
+              fontSize: 13,
+              fontWeight: 700,
+              cursor: 'pointer',
+              transition: 'all 0.15s ease',
             }}
           >
-            <LayoutGrid size={14} />
-            <span>{language === 'th' ? 'กรุณาแตะเลือกโต๊ะจากผังด้านซ้าย' : 'Select table on the left'}</span>
-          </div>
-        )}
+            <Receipt size={15} />
+            <span>{language === 'th' ? 'รายการสั่ง' : 'POS Order'}</span>
+          </button>
 
-        {activeOrder && (
-          <div
+          {/* 2. บิลย้อนหลัง */}
+          <button
+            onClick={() => {
+              setAdminSubTab('bills');
+              setActiveTab('admin');
+            }}
             style={{
               display: 'flex',
               alignItems: 'center',
               gap: 6,
+              padding: '6px 14px',
+              borderRadius: 8,
+              border: activeTab === 'admin' && adminSubTab === 'bills' ? '1px solid rgba(245, 158, 11, 0.4)' : '1px solid var(--color-border)',
+              background: activeTab === 'admin' && adminSubTab === 'bills' ? 'linear-gradient(135deg, rgba(245, 158, 11, 0.2), rgba(217, 119, 6, 0.1))' : 'rgba(255, 255, 255, 0.04)',
+              color: activeTab === 'admin' && adminSubTab === 'bills' ? 'var(--color-primary)' : 'var(--color-text-secondary)',
+              fontSize: 13,
+              fontWeight: 700,
+              cursor: 'pointer',
+              transition: 'all 0.15s ease',
+            }}
+          >
+            <History size={15} />
+            <span>{language === 'th' ? 'บิลย้อนหลัง' : 'Bill History'}</span>
+          </button>
+
+          {/* 3. จัดการกะ */}
+          <button
+            onClick={() => {
+              setAdminSubTab('shifts');
+              setActiveTab('admin');
+            }}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              padding: '6px 14px',
+              borderRadius: 8,
+              border: activeTab === 'admin' && adminSubTab === 'shifts' ? '1px solid rgba(245, 158, 11, 0.4)' : '1px solid var(--color-border)',
+              background: activeTab === 'admin' && adminSubTab === 'shifts' ? 'linear-gradient(135deg, rgba(245, 158, 11, 0.2), rgba(217, 119, 6, 0.1))' : 'rgba(255, 255, 255, 0.04)',
+              color: activeTab === 'admin' && adminSubTab === 'shifts' ? 'var(--color-primary)' : 'var(--color-text-secondary)',
+              fontSize: 13,
+              fontWeight: 700,
+              cursor: 'pointer',
+              transition: 'all 0.15s ease',
+            }}
+          >
+            <Clock size={15} />
+            <span>{language === 'th' ? 'จัดการกะ' : 'Shift Management'}</span>
+          </button>
+        </div>
+
+        {/* Right side active table indicator */}
+        {activeTable && (
+          <div
+            style={{
               fontSize: 12,
-              color: '#fff',
-              background: 'rgba(255, 255, 255, 0.06)',
-              padding: '3px 8px',
+              fontWeight: 700,
+              color: 'var(--color-text-secondary)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              background: 'rgba(255, 255, 255, 0.04)',
+              padding: '4px 10px',
               borderRadius: 6,
               border: '1px solid var(--color-border)',
             }}
           >
-            <Receipt size={13} style={{ color: 'var(--color-primary)' }} />
-            <span style={{ fontWeight: 700 }}>{activeOrder.orderNumber}</span>
-            <span>•</span>
-            <span style={{ color: 'var(--color-primary)', fontWeight: 800, fontFamily: 'var(--font-mono)' }}>
-              ฿{activeOrder.grandTotal.toLocaleString()}
+            <span style={{ color: 'var(--color-primary)', fontWeight: 800 }}>
+              {language === 'th' ? `โต๊ะ ${activeTable.number}` : `Table ${activeTable.number}`}
             </span>
           </div>
         )}
