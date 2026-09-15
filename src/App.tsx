@@ -150,12 +150,13 @@ const POSContent: React.FC = () => {
           alignItems: 'center',
           justifyContent: 'space-between',
           padding: '0 max(16px, var(--safe-right)) 0 max(16px, var(--safe-left))',
+          position: 'relative',
           zIndex: 50,
           gap: 10,
         }}
       >
         {/* Left: Hamburger Menu + Restaurant Name */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0, zIndex: 2 }}>
           {/* Hamburger + Active Tab Dropdown */}
           <div ref={menuRef} style={{ position: 'relative', flexShrink: 0 }}>
             <button
@@ -398,15 +399,77 @@ const POSContent: React.FC = () => {
                   }}
                 />
                 <span>ระบบออนไลน์</span>
-                <span>•</span>
-                <span>Project Alberta</span>
               </div>
             </div>
           </div>
         </div>
 
+        {/* Center: Alberta Logo */}
+        <div
+          className="header-center-logo"
+          style={{
+            position: 'absolute',
+            left: '50%',
+            top: '50%',
+            transform: 'translate(-50%, -50%)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            pointerEvents: 'none',
+            zIndex: 1,
+          }}
+        >
+          <div
+            style={{
+              width: 28,
+              height: 28,
+              borderRadius: 8,
+              background: 'linear-gradient(135deg, #f59e0b, #d97706)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: '0 0 14px rgba(245, 158, 11, 0.45)',
+              fontWeight: 900,
+              fontSize: 15,
+              color: '#000',
+              flexShrink: 0,
+              letterSpacing: '-0.02em',
+            }}
+          >
+            A
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', lineHeight: 1.05 }}>
+            <span
+              style={{
+                fontSize: 15,
+                fontWeight: 900,
+                letterSpacing: '0.08em',
+                background: 'linear-gradient(135deg, #ffffff 40%, #f59e0b 100%)',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+                whiteSpace: 'nowrap',
+                textTransform: 'uppercase',
+              }}
+            >
+              PROJECT ALBERTA
+            </span>
+            <span
+              style={{
+                fontSize: 8.5,
+                fontWeight: 700,
+                color: 'var(--color-primary)',
+                letterSpacing: '0.14em',
+                textTransform: 'uppercase',
+                opacity: 0.9,
+              }}
+            >
+              THAI SME POS
+            </span>
+          </div>
+        </div>
+
         {/* Right: Quick Shift Status + Staff Badge */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0, zIndex: 2 }}>
           {/* Background Order Queue Worker Indicator */}
           <button
             onClick={() => setActiveModal('order_queue')}
