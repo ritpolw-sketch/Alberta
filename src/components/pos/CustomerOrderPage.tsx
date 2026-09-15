@@ -13,6 +13,8 @@ import {
   Lock,
   Receipt,
   Check,
+  CreditCard,
+  Store,
 } from 'lucide-react';
 import type { MenuItem, SelectedModifier, OrderItem } from '../../types/pos';
 import confetti from 'canvas-confetti';
@@ -799,12 +801,12 @@ export const CustomerOrderPage: React.FC = () => {
           </div>
         )}
 
-        {/* TAB 3: Status of Sent Orders */}
+        {/* TAB 3: รายการบิลรอชำระ (Bill Items Awaiting Payment) */}
         {activeCustomerTab === 'status' && (
           <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 14 }}>
             <h3 style={{ fontSize: 16, fontWeight: 800, color: '#fff', display: 'flex', alignItems: 'center', gap: 8 }}>
               <Receipt size={18} style={{ color: 'var(--color-primary)' }} />
-              <span>ติดตามออเดอร์ของโต๊ะ {tableCodeParam}</span>
+              <span>รายการบิลรอชำระ (โต๊ะ {tableCodeParam})</span>
             </h3>
 
             {sentItems.length === 0 ? (
@@ -816,56 +818,183 @@ export const CustomerOrderPage: React.FC = () => {
                   textAlign: 'center',
                   color: 'var(--color-text-muted)',
                   fontSize: 13,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: 8,
                 }}
               >
-                ยังไม่มีรายการอาหารที่ส่งเข้าครัวในรอบนี้
+                <Receipt size={32} />
+                <div style={{ fontSize: 14, fontWeight: 700, color: '#fff' }}>ยังไม่มีรายการบิลรอชำระสำหรับโต๊ะนี้</div>
+                <p style={{ fontSize: 12 }}>เมื่อเลือกอาหารแล้วกดยืนยันส่งเข้าครัว รายการบิลรอชำระจะแสดงที่นี่</p>
               </div>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {sentItems.map((item) => (
+              <>
+                {/* Cashier Payment Instruction Card */}
+                <div
+                  style={{
+                    background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.15), rgba(217, 119, 6, 0.08))',
+                    border: '1.5px solid var(--color-primary)',
+                    borderRadius: 'var(--radius-lg)',
+                    padding: '14px 16px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 8,
+                    boxShadow: '0 4px 14px rgba(245, 158, 11, 0.2)',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--color-primary)', fontWeight: 800, fontSize: 14 }}>
+                    <CreditCard size={18} />
+                    <span>คำแนะนำการชำระเงินที่เคาน์เตอร์แคชเชียร์</span>
+                  </div>
+                  <p style={{ fontSize: 12.5, color: '#fff', lineHeight: 1.5 }}>
+                    เมื่อรับประทานอาหารเสร็จเรียบร้อยแล้ว กรุณาแจ้งหมายเลข <strong style={{ color: 'var(--color-primary)' }}>โต๊ะ {tableCodeParam}</strong> ที่เคาน์เตอร์ชำระเงิน (Cashier Counter) เพื่อชำระเงินด้วยเงินสด หรือสแกน QR Code โอนผ่าน PromptPay
+                  </p>
+                  <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', display: 'flex', alignItems: 'center', gap: 5, paddingTop: 4, borderTop: '1px dashed rgba(245, 158, 11, 0.3)' }}>
+                    <Store size={13} />
+                    <span>ขอบคุณที่ใช้บริการ {settings.restaurantNameTh} ({settings.branchName})</span>
+                  </div>
+                </div>
+
+                {/* List of Bill Items Awaiting Payment */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--color-text-secondary)' }}>
+                    รายการอาหารที่สั่งทั้งหมด ({sentItems.length} รายการ):
+                  </div>
+
+                  {sentItems.map((item) => {
+                    const menuItemObj = menuItems.find((m) => m.id === item.menuItemId);
+                    const itemImageUrl = item.imageUrl || menuItemObj?.imageUrl;
+
+                    return (
+                      <div
+                        key={item.id}
+                        style={{
+                          background: 'var(--color-bg-elevated)',
+                          border: '1px solid var(--color-border)',
+                          borderRadius: 'var(--radius-md)',
+                          padding: 10,
+                          display: 'flex',
+                          gap: 10,
+                          alignItems: 'center',
+                        }}
+                      >
+                        {/* Thumbnail Image */}
+                        {itemImageUrl ? (
+                          <img
+                            src={itemImageUrl}
+                            alt={language === 'th' ? item.nameTh : item.nameEn}
+                            style={{
+                              width: 42,
+                              height: 42,
+                              borderRadius: 8,
+                              objectFit: 'cover',
+                              flexShrink: 0,
+                              border: '1px solid rgba(245, 158, 11, 0.3)',
+                            }}
+                          />
+                        ) : (
+                          <div
+                            style={{
+                              width: 42,
+                              height: 42,
+                              borderRadius: 8,
+                              background: 'rgba(255, 255, 255, 0.06)',
+                              border: '1px solid var(--color-border)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontSize: 20,
+                              flexShrink: 0,
+                            }}
+                          >
+                            🍽️
+                          </div>
+                        )}
+
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 6 }}>
+                            <span style={{ fontSize: 13, fontWeight: 700, color: '#fff' }}>
+                              {item.quantity}x {language === 'th' ? item.nameTh : item.nameEn}
+                            </span>
+                            <span style={{ fontSize: 14, fontWeight: 800, color: 'var(--color-primary)', fontFamily: 'var(--font-mono)' }}>
+                              ฿{item.itemTotal.toLocaleString()}
+                            </span>
+                          </div>
+
+                          {item.modifiers.length > 0 && (
+                            <div style={{ fontSize: 10.5, color: 'var(--color-text-secondary)', marginTop: 2 }}>
+                              {item.modifiers.map((m) => (language === 'th' ? m.optionNameTh : m.optionNameEn)).join(', ')}
+                            </div>
+                          )}
+                        </div>
+
+                        <div
+                          style={{
+                            padding: '3px 8px',
+                            borderRadius: 10,
+                            fontSize: 10,
+                            fontWeight: 800,
+                            background:
+                              item.status === 'served'
+                                ? 'rgba(16, 185, 129, 0.2)'
+                                : 'rgba(245, 158, 11, 0.2)',
+                            color: item.status === 'served' ? '#10b981' : '#f59e0b',
+                            border:
+                              item.status === 'served'
+                                ? '1px solid #10b981'
+                                : '1px solid #f59e0b',
+                            flexShrink: 0,
+                          }}
+                        >
+                          {item.status === 'served' ? 'เสิร์ฟแล้ว' : 'กำลังปรุง'}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Bill Financial Totals Summary Box */}
+                {currentOrder && (
                   <div
-                    key={item.id}
                     style={{
-                      background: 'var(--color-bg-elevated)',
+                      background: 'var(--color-bg-card)',
                       border: '1px solid var(--color-border)',
                       borderRadius: 'var(--radius-md)',
-                      padding: 12,
+                      padding: 14,
                       display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
+                      flexDirection: 'column',
+                      gap: 6,
                     }}
                   >
-                    <div>
-                      <div style={{ fontSize: 14, fontWeight: 700, color: '#fff' }}>
-                        {item.quantity}x {language === 'th' ? item.nameTh : item.nameEn}
-                      </div>
-                      <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginTop: 2 }}>
-                        ฿{item.itemTotal.toLocaleString()}
-                      </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--color-text-secondary)' }}>
+                      <span>ยอดรวมอาหาร (Subtotal)</span>
+                      <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>฿{currentOrder.subtotal.toLocaleString()}</span>
                     </div>
 
-                    <div
-                      style={{
-                        padding: '4px 10px',
-                        borderRadius: 12,
-                        fontSize: 11,
-                        fontWeight: 800,
-                        background:
-                          item.status === 'served'
-                            ? 'rgba(16, 185, 129, 0.2)'
-                            : 'rgba(245, 158, 11, 0.2)',
-                        color: item.status === 'served' ? '#10b981' : '#f59e0b',
-                        border:
-                          item.status === 'served'
-                            ? '1px solid #10b981'
-                            : '1px solid #f59e0b',
-                      }}
-                    >
-                      {item.status === 'served' ? '🚚 เสิร์ฟแล้ว' : '🍳 กำลังปรุง'}
+                    {settings.enableServiceCharge && currentOrder.serviceChargeAmount > 0 && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--color-text-secondary)' }}>
+                        <span>Service Charge ({Math.round(settings.serviceChargeRate * 100)}%)</span>
+                        <span style={{ fontFamily: 'var(--font-mono)' }}>฿{currentOrder.serviceChargeAmount.toLocaleString()}</span>
+                      </div>
+                    )}
+
+                    {settings.enableVat && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--color-text-muted)' }}>
+                        <span>VAT ({Math.round(settings.vatRate * 100)}%)</span>
+                        <span style={{ fontFamily: 'var(--font-mono)' }}>฿{currentOrder.vatAmount.toLocaleString()}</span>
+                      </div>
+                    )}
+
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', paddingTop: 6, marginTop: 2, borderTop: '1px dashed var(--color-border)' }}>
+                      <span style={{ fontSize: 14, fontWeight: 800, color: '#fff' }}>ยอดรวมสุทธิที่ต้องชำระ (Total Due)</span>
+                      <span style={{ fontSize: 18, fontWeight: 900, color: 'var(--color-primary)', fontFamily: 'var(--font-mono)' }}>
+                        ฿{currentOrder.grandTotal.toLocaleString()}
+                      </span>
                     </div>
                   </div>
-                ))}
-              </div>
+                )}
+              </>
             )}
           </div>
         )}
@@ -966,7 +1095,7 @@ export const CustomerOrderPage: React.FC = () => {
           }}
         >
           <Receipt size={18} />
-          <span>สถานะออเดอร์</span>
+          <span>รายการบิลรอชำระ</span>
         </button>
       </nav>
 
