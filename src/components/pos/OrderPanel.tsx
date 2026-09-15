@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { MenuCatalog } from './MenuCatalog';
+import { TableOrderQRModal } from './TableOrderQRModal';
 import type { MenuItem, Order, RestaurantSettings } from '../../types/pos';
 
 interface OrderPanelProps {
@@ -25,15 +26,19 @@ export const OrderPanel: React.FC<OrderPanelProps> = ({ hideMenuToggle = false }
     activeOrder,
     updateOrderItemQuantity,
     removeOrderItem,
+    clearOrder,
     settings,
     language,
     addItemToOrder,
     processPayment,
     currentStaff,
+    menuItems,
   } = usePOS();
 
   const [catalogView, setCatalogView] = useState<'menu' | 'cart'>('cart');
   const [isCashModalOpen, setIsCashModalOpen] = useState(false);
+  const [isClearModalOpen, setIsClearModalOpen] = useState(false);
+  const [isQRModalOpen, setIsQRModalOpen] = useState(false);
   const [cashTendered, setCashTendered] = useState<string>('');
   const [isPaying, setIsPaying] = useState(false);
 
@@ -196,11 +201,10 @@ export const OrderPanel: React.FC<OrderPanelProps> = ({ hideMenuToggle = false }
           </span>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          {activeOrder && items.length > 0 && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          {activeTable && (
             <button
-              onClick={handleDirectPrintReceipt}
-              className="btn-secondary"
+              onClick={() => setIsQRModalOpen(true)}
               style={{
                 padding: '6px 10px',
                 display: 'flex',
@@ -208,13 +212,70 @@ export const OrderPanel: React.FC<OrderPanelProps> = ({ hideMenuToggle = false }
                 gap: 5,
                 fontSize: 12,
                 fontWeight: 700,
+                background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.2), rgba(217, 119, 6, 0.1))',
+                border: '1px solid rgba(245, 158, 11, 0.4)',
+                color: 'var(--color-primary)',
+                borderRadius: 6,
+                cursor: 'pointer',
+                transition: 'all 0.15s ease',
                 flexShrink: 0,
               }}
-              title={language === 'th' ? 'พิมพ์ใบเรียกเก็บเงินทันที (ไม่มี Modal)' : 'Print bill directly'}
+              title={language === 'th' ? 'พิมพ์ QR Code สั่งอาหารให้ลูกค้าสแกนสั่งเอง' : 'Print Customer Order QR'}
             >
-              <Printer size={15} />
-              <span>{language === 'th' ? 'พิมพ์บิล' : 'Print'}</span>
+              <QrCode size={14} />
+              <span>{language === 'th' ? 'QR สั่งอาหาร' : 'Order QR'}</span>
             </button>
+          )}
+
+          {activeOrder && items.length > 0 && (
+            <>
+              <button
+                onClick={() => setIsClearModalOpen(true)}
+                style={{
+                  padding: '6px 10px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 5,
+                  fontSize: 12,
+                  fontWeight: 700,
+                  background: 'rgba(239, 68, 68, 0.12)',
+                  border: '1px solid rgba(239, 68, 68, 0.3)',
+                  color: '#f87171',
+                  borderRadius: 6,
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease',
+                  flexShrink: 0,
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'rgba(239, 68, 68, 0.25)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'rgba(239, 68, 68, 0.12)';
+                }}
+                title={language === 'th' ? 'ล้างรายการอาหารทั้งหมดในบิล (Reset)' : 'Clear all items in bill'}
+              >
+                <Trash2 size={14} />
+                <span>{language === 'th' ? 'ล้างบิล' : 'Clear'}</span>
+              </button>
+
+              <button
+                onClick={handleDirectPrintReceipt}
+                className="btn-secondary"
+                style={{
+                  padding: '6px 10px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 5,
+                  fontSize: 12,
+                  fontWeight: 700,
+                  flexShrink: 0,
+                }}
+                title={language === 'th' ? 'พิมพ์ใบเรียกเก็บเงินทันที (ไม่มี Modal)' : 'Print bill directly'}
+              >
+                <Printer size={15} />
+                <span>{language === 'th' ? 'พิมพ์บิล' : 'Print'}</span>
+              </button>
+            </>
           )}
 
           {/* Toggle between Menu Catalog & Cart (only when menu is not displayed side-by-side) */}
@@ -311,6 +372,9 @@ export const OrderPanel: React.FC<OrderPanelProps> = ({ hideMenuToggle = false }
               </div>
             ) : (
               items.map((item) => {
+                const menuItemObj = menuItems.find((m) => m.id === item.menuItemId);
+                const itemImageUrl = item.imageUrl || menuItemObj?.imageUrl;
+
                 return (
                   <div
                     key={item.id}
@@ -318,27 +382,82 @@ export const OrderPanel: React.FC<OrderPanelProps> = ({ hideMenuToggle = false }
                       background: 'var(--color-bg-elevated)',
                       borderRadius: 'var(--radius-md)',
                       border: '1px solid ' + (item.status === 'pending' ? 'rgba(245, 158, 11, 0.25)' : 'var(--color-border)'),
-                      padding: '12px 14px',
+                      padding: '10px 12px',
                       display: 'flex',
                       flexDirection: 'column',
                       gap: 8,
                       position: 'relative',
                     }}
                   >
-                    {/* Item Title & Price */}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                      <div style={{ flex: 1, paddingRight: 8 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                          <span style={{ fontSize: 14, fontWeight: 700, color: '#fff' }}>
+                    {/* Top Section: Thumbnail + Item Details + Price */}
+                    <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                      {/* Eye-Tracing Thumbnail Badge */}
+                      {itemImageUrl ? (
+                        <img
+                          src={itemImageUrl}
+                          alt={language === 'th' ? item.nameTh : item.nameEn}
+                          style={{
+                            width: 44,
+                            height: 44,
+                            borderRadius: 8,
+                            objectFit: 'cover',
+                            flexShrink: 0,
+                            border: '1px solid rgba(245, 158, 11, 0.35)',
+                            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.4)',
+                          }}
+                        />
+                      ) : (
+                        <div
+                          style={{
+                            width: 44,
+                            height: 44,
+                            borderRadius: 8,
+                            background: 'rgba(255, 255, 255, 0.06)',
+                            border: '1px solid var(--color-border)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: 22,
+                            flexShrink: 0,
+                          }}
+                        >
+                          🍽️
+                        </div>
+                      )}
+
+                      {/* Item Title & Price */}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 6 }}>
+                          <span
+                            style={{
+                              fontSize: 13,
+                              fontWeight: 700,
+                              color: '#fff',
+                              lineHeight: 1.3,
+                              display: '-webkit-box',
+                              WebkitLineClamp: 2,
+                              WebkitBoxOrient: 'vertical',
+                              overflow: 'hidden',
+                            }}
+                          >
                             {language === 'th' ? item.nameTh : item.nameEn}
                           </span>
+                          <span style={{ fontSize: 14, fontWeight: 800, color: 'var(--color-primary)', fontFamily: 'var(--font-mono)', flexShrink: 0 }}>
+                            ฿{item.itemTotal.toLocaleString()}
+                          </span>
                         </div>
-                      </div>
 
-                      <div style={{ textAlign: 'right' }}>
-                        <span style={{ fontSize: 15, fontWeight: 700, color: '#fff', fontFamily: 'var(--font-mono)' }}>
-                          ฿{item.itemTotal.toLocaleString()}
-                        </span>
+                        {/* Modifiers & Special Instructions */}
+                        {item.modifiers.length > 0 && (
+                          <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginTop: 2, lineHeight: 1.2 }}>
+                            {item.modifiers.map((m) => (language === 'th' ? m.optionNameTh : m.optionNameEn)).join(', ')}
+                          </div>
+                        )}
+                        {item.specialInstructions && (
+                          <div style={{ fontSize: 10, color: 'var(--color-primary)', fontStyle: 'italic', marginTop: 1 }}>
+                            * {item.specialInstructions}
+                          </div>
+                        )}
                       </div>
                     </div>
 
@@ -834,6 +953,97 @@ export const OrderPanel: React.FC<OrderPanelProps> = ({ hideMenuToggle = false }
           </div>
         </div>
       )}
+      {/* Clear Order Confirmation Modal */}
+      {isClearModalOpen && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0, 0, 0, 0.75)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            padding: 16,
+          }}
+        >
+          <div
+            style={{
+              background: 'var(--color-bg-card)',
+              border: '1px solid rgba(239, 68, 68, 0.4)',
+              borderRadius: 'var(--radius-lg)',
+              width: '100%',
+              maxWidth: 400,
+              padding: 24,
+              boxShadow: '0 20px 50px rgba(0,0,0,0.8)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 16,
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, color: '#f87171' }}>
+                <Trash2 size={24} />
+                <h3 style={{ fontSize: 18, fontWeight: 800, color: '#fff' }}>
+                  {language === 'th' ? 'ยืนยันล้างบิลอาหาร?' : 'Clear Order Confirmation'}
+                </h3>
+              </div>
+              <button
+                onClick={() => setIsClearModalOpen(false)}
+                style={{ background: 'transparent', border: 'none', color: 'var(--color-text-secondary)', cursor: 'pointer' }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <p style={{ fontSize: 14, color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>
+              {language === 'th'
+                ? `คุณต้องการลบรายการอาหารทั้งหมด (${items.length} รายการ) ออกจากบิล โต๊ะ ${activeTable?.number} ใช่หรือไม่?`
+                : `Are you sure you want to clear all ${items.length} items from Table ${activeTable?.number}'s bill?`}
+            </p>
+
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 8 }}>
+              <button
+                onClick={() => setIsClearModalOpen(false)}
+                className="btn-secondary"
+                style={{ padding: '8px 16px', fontSize: 13, fontWeight: 700 }}
+              >
+                {language === 'th' ? 'ยกเลิก' : 'Cancel'}
+              </button>
+              <button
+                onClick={() => {
+                  clearOrder();
+                  setIsClearModalOpen(false);
+                }}
+                style={{
+                  padding: '8px 18px',
+                  fontSize: 13,
+                  fontWeight: 800,
+                  background: 'linear-gradient(135deg, #ef4444, #dc2626)',
+                  border: 'none',
+                  borderRadius: 'var(--radius-md)',
+                  color: '#fff',
+                  cursor: 'pointer',
+                  boxShadow: '0 4px 14px rgba(239, 68, 68, 0.4)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                }}
+              >
+                <Trash2 size={16} />
+                <span>{language === 'th' ? 'ยืนยันล้างบิล' : 'Yes, Clear Bill'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Customer Order QR Print & Simulation Modal */}
+      <TableOrderQRModal
+        isOpen={isQRModalOpen}
+        onClose={() => setIsQRModalOpen(false)}
+        table={activeTable || null}
+      />
     </div>
   );
 };

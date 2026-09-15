@@ -74,6 +74,7 @@ export interface OrderItem {
   menuItemId: string;
   nameTh: string;
   nameEn: string;
+  imageUrl?: string;
   basePrice: number;
   quantity: number;
   modifiers: SelectedModifier[];

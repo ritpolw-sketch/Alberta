@@ -93,6 +93,7 @@ interface POSContextType {
   quickAddItemToOrder: (item: MenuItem) => void;
   updateOrderItemQuantity: (orderItemId: string, delta: number) => void;
   removeOrderItem: (orderItemId: string) => void;
+  clearOrder: () => void;
   sendOrderToKitchen: () => void;
   processPayment: (payment: Omit<PaymentRecord, 'id' | 'paidAt' | 'staffName'>) => Promise<PaymentRecord>;
   voidOrder: (reason: string) => void;
@@ -646,6 +647,7 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       menuItemId: menuItem.id,
       nameTh: menuItem.nameTh,
       nameEn: menuItem.nameEn,
+      imageUrl: menuItem.imageUrl,
       basePrice: menuItem.price,
       quantity,
       modifiers,
@@ -814,6 +816,26 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       [activeOrder.id]: {
         ...activeOrder,
         items: updatedItems,
+        subtotal,
+        serviceChargeRate: scRate,
+        serviceChargeAmount: scAmount,
+        vatAmount,
+        grandTotal,
+        updatedAt: new Date().toISOString(),
+      },
+    }));
+  };
+
+  const clearOrder = () => {
+    if (!activeOrder) return;
+    const { subtotal, scAmount, scRate, vatAmount, grandTotal } =
+      calculateOrderTotals([], settings.enableServiceCharge, settings.enableVat, settings.isVatInclusive);
+
+    setOrders((prev) => ({
+      ...prev,
+      [activeOrder.id]: {
+        ...activeOrder,
+        items: [],
         subtotal,
         serviceChargeRate: scRate,
         serviceChargeAmount: scAmount,
@@ -1427,6 +1449,7 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         quickAddItemToOrder,
         updateOrderItemQuantity,
         removeOrderItem,
+        clearOrder,
         sendOrderToKitchen,
         processPayment,
         voidOrder,
