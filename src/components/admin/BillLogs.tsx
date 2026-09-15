@@ -18,9 +18,6 @@ import {
   Clock,
   Printer,
   Calendar,
-  TrendingUp,
-  Hash,
-  PieChart,
 } from 'lucide-react';
 import type { Order, PaymentMethod } from '../../types/pos';
 
@@ -134,22 +131,6 @@ export const BillLogs: React.FC = () => {
     return groups;
   }, [filteredBills]);
 
-  // Daily KPI stats for the visible filtered bills
-  const dailyStats = useMemo(() => {
-    const completedBills = filteredBills.filter((b) => b.status === 'completed');
-    const totalSales = completedBills.reduce((sum, b) => sum + b.grandTotal, 0);
-    const billCount = filteredBills.length;
-    const completedCount = completedBills.length;
-    const voidedCount = filteredBills.filter((b) => b.status === 'voided').length;
-    const avgTicket = completedCount > 0 ? Math.round(totalSales / completedCount) : 0;
-
-    const cashSales = completedBills.filter((b) => b.payment?.method === 'cash').reduce((sum, b) => sum + b.grandTotal, 0);
-    const promptpaySales = completedBills.filter((b) => b.payment?.method === 'promptpay').reduce((sum, b) => sum + b.grandTotal, 0);
-    const cardSales = completedBills.filter((b) => b.payment?.method === 'card').reduce((sum, b) => sum + b.grandTotal, 0);
-
-    return { totalSales, billCount, completedCount, voidedCount, avgTicket, cashSales, promptpaySales, cardSales };
-  }, [filteredBills]);
-
   const isSingleDay = dateFrom === dateTo;
   const isToday = dateFrom === todayKey() && dateTo === todayKey();
 
@@ -256,28 +237,6 @@ export const BillLogs: React.FC = () => {
     borderBottom: '1px solid rgba(255,255,255,0.04)',
     verticalAlign: 'middle',
   };
-
-  const kpiCardStyle: React.CSSProperties = {
-    background: 'var(--color-bg-card)',
-    border: '1px solid var(--color-border)',
-    borderRadius: 14,
-    padding: '18px 20px',
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 6,
-    transition: 'all 0.2s',
-  };
-
-  const iconBoxStyle = (color: string): React.CSSProperties => ({
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    background: `${color}15`,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    color,
-  });
 
   // ─── Render ────────────────────────────────────
   return (
@@ -450,106 +409,6 @@ export const BillLogs: React.FC = () => {
             ? (isToday ? '📅 วันนี้ — ' : '📅 ') + toThaiDate(dateFrom)
             : `📅 ${toThaiDate(dateFrom)} — ${toThaiDate(dateTo)}`
           }
-        </div>
-      </div>
-
-      {/* ── Daily Summary KPI Cards ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14 }}>
-        {/* Total Sales */}
-        <div style={kpiCardStyle}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: 12, color: 'var(--color-text-secondary)', fontWeight: 600 }}>
-              ยอดขายรวม
-            </span>
-            <div style={iconBoxStyle('#f59e0b')}>
-              <TrendingUp size={18} />
-            </div>
-          </div>
-          <div style={{ fontSize: 26, fontWeight: 800, color: 'var(--color-primary)', fontFamily: 'var(--font-mono)' }}>
-            ฿{dailyStats.totalSales.toLocaleString()}
-          </div>
-          <div style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>
-            เฉพาะบิลชำระแล้ว ({dailyStats.completedCount} บิล)
-          </div>
-        </div>
-
-        {/* Bill Count */}
-        <div style={kpiCardStyle}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: 12, color: 'var(--color-text-secondary)', fontWeight: 600 }}>
-              จำนวนบิลทั้งหมด
-            </span>
-            <div style={iconBoxStyle('#3b82f6')}>
-              <Hash size={18} />
-            </div>
-          </div>
-          <div style={{ fontSize: 26, fontWeight: 800, color: '#fff', fontFamily: 'var(--font-mono)' }}>
-            {dailyStats.billCount}
-          </div>
-          <div style={{ display: 'flex', gap: 10, fontSize: 11 }}>
-            <span style={{ color: '#10b981' }}>✅ {dailyStats.completedCount} ชำระ</span>
-            {dailyStats.voidedCount > 0 && (
-              <span style={{ color: '#ef4444' }}>❌ {dailyStats.voidedCount} ยกเลิก</span>
-            )}
-          </div>
-        </div>
-
-        {/* Average Ticket */}
-        <div style={kpiCardStyle}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: 12, color: 'var(--color-text-secondary)', fontWeight: 600 }}>
-              เฉลี่ยต่อบิล
-            </span>
-            <div style={iconBoxStyle('#10b981')}>
-              <Receipt size={18} />
-            </div>
-          </div>
-          <div style={{ fontSize: 26, fontWeight: 800, color: '#fff', fontFamily: 'var(--font-mono)' }}>
-            ฿{dailyStats.avgTicket.toLocaleString()}
-          </div>
-          <div style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>
-            Average ticket size
-          </div>
-        </div>
-
-        {/* Payment Channel Breakdown */}
-        <div style={kpiCardStyle}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: 12, color: 'var(--color-text-secondary)', fontWeight: 600 }}>
-              ช่องทางชำระเงิน
-            </span>
-            <div style={iconBoxStyle('#8b5cf6')}>
-              <PieChart size={18} />
-            </div>
-          </div>
-          {/* Mini payment bars */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 4 }}>
-            {[
-              { label: 'เงินสด', amount: dailyStats.cashSales, color: '#10b981', icon: <Banknote size={12} /> },
-              { label: 'PromptPay', amount: dailyStats.promptpaySales, color: '#3b82f6', icon: <QrCode size={12} /> },
-              { label: 'บัตร', amount: dailyStats.cardSales, color: '#8b5cf6', icon: <CreditCard size={12} /> },
-            ].map((ch) => (
-              <div key={ch.label} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 4, minWidth: 70, color: ch.color, fontSize: 11, fontWeight: 600 }}>
-                  {ch.icon} {ch.label}
-                </div>
-                <div style={{ flex: 1, height: 6, background: 'rgba(255,255,255,0.06)', borderRadius: 3, overflow: 'hidden' }}>
-                  <div
-                    style={{
-                      height: '100%',
-                      width: dailyStats.totalSales > 0 ? `${(ch.amount / dailyStats.totalSales) * 100}%` : '0%',
-                      background: ch.color,
-                      borderRadius: 3,
-                      transition: 'width 0.3s ease',
-                    }}
-                  />
-                </div>
-                <span style={{ fontSize: 11, fontWeight: 700, color: '#fff', fontFamily: 'var(--font-mono)', minWidth: 50, textAlign: 'right' }}>
-                  ฿{ch.amount.toLocaleString()}
-                </span>
-              </div>
-            ))}
-          </div>
         </div>
       </div>
 
