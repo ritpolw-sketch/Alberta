@@ -404,7 +404,7 @@ const POSContent: React.FC = () => {
           </div>
         </div>
 
-        {/* Center: Alberta Logo */}
+        {/* Center: Alberta Logo (Glassy & Subtle) */}
         <div
           className="header-center-logo"
           style={{
@@ -415,37 +415,39 @@ const POSContent: React.FC = () => {
             display: 'flex',
             alignItems: 'center',
             gap: 8,
+            padding: '3px 10px 3px 4px',
+            background: 'rgba(255, 255, 255, 0.04)',
+            backdropFilter: 'blur(10px)',
+            border: '1px solid rgba(255, 255, 255, 0.08)',
+            borderRadius: 20,
             pointerEvents: 'none',
             zIndex: 1,
           }}
         >
           <div
             style={{
-              width: 28,
-              height: 28,
-              borderRadius: 8,
-              background: 'linear-gradient(135deg, #f59e0b, #d97706)',
+              width: 24,
+              height: 24,
+              borderRadius: '50%',
+              background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.25), rgba(217, 119, 6, 0.15))',
+              border: '1px solid rgba(245, 158, 11, 0.35)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              boxShadow: '0 0 14px rgba(245, 158, 11, 0.45)',
-              fontWeight: 900,
-              fontSize: 15,
-              color: '#000',
+              fontWeight: 800,
+              fontSize: 12,
+              color: 'var(--color-primary)',
               flexShrink: 0,
-              letterSpacing: '-0.02em',
             }}
           >
             A
           </div>
           <span
             style={{
-              fontSize: 15,
-              fontWeight: 900,
-              letterSpacing: '0.08em',
-              background: 'linear-gradient(135deg, #ffffff 40%, #f59e0b 100%)',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
+              fontSize: 13,
+              fontWeight: 700,
+              letterSpacing: '0.06em',
+              color: 'rgba(255, 255, 255, 0.85)',
               whiteSpace: 'nowrap',
               textTransform: 'uppercase',
             }}

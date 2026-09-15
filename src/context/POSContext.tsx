@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import type {
   Table,
   TableStatus,
@@ -601,39 +601,42 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   );
 
   // Calculate totals helper
-  const calculateOrderTotals = (
-    items: OrderItem[],
-    enableSC = settings.enableServiceCharge,
-    enableVat = settings.enableVat,
-    isInclusive = settings.isVatInclusive
-  ) => {
-    const subtotal = items
-      .filter((i) => i.status !== 'voided')
-      .reduce((sum, item) => sum + item.itemTotal, 0);
+  const calculateOrderTotals = useCallback(
+    (
+      items: OrderItem[],
+      enableSC = settings.enableServiceCharge,
+      enableVat = settings.enableVat,
+      isInclusive = settings.isVatInclusive
+    ) => {
+      const subtotal = items
+        .filter((i) => i.status !== 'voided')
+        .reduce((sum, item) => sum + item.itemTotal, 0);
 
-    const scRate = enableSC ? settings.serviceChargeRate : 0;
-    const scAmount = enableSC ? Math.round(subtotal * scRate * 100) / 100 : 0;
+      const scRate = enableSC ? settings.serviceChargeRate : 0;
+      const scAmount = enableSC ? Math.round(subtotal * scRate * 100) / 100 : 0;
 
-    let vatAmount = 0;
-    let grandTotal = 0;
+      let vatAmount = 0;
+      let grandTotal = 0;
 
-    const vatPct = (settings.vatRate || 0.07) * 100;
+      const vatPct = (settings.vatRate || 0.07) * 100;
 
-    if (!enableVat) {
-      vatAmount = 0;
-      grandTotal = subtotal + scAmount;
-    } else if (isInclusive) {
-      // VAT is already included in subtotal
-      vatAmount = Math.round(((subtotal + scAmount) * vatPct) / (100 + vatPct) * 100) / 100;
-      grandTotal = subtotal + scAmount;
-    } else {
-      // VAT is added on top
-      vatAmount = Math.round((subtotal + scAmount) * (settings.vatRate || 0.07) * 100) / 100;
-      grandTotal = subtotal + scAmount + vatAmount;
-    }
+      if (!enableVat) {
+        vatAmount = 0;
+        grandTotal = subtotal + scAmount;
+      } else if (isInclusive) {
+        // VAT is already included in subtotal
+        vatAmount = Math.round(((subtotal + scAmount) * vatPct) / (100 + vatPct) * 100) / 100;
+        grandTotal = subtotal + scAmount;
+      } else {
+        // VAT is added on top
+        vatAmount = Math.round((subtotal + scAmount) * (settings.vatRate || 0.07) * 100) / 100;
+        grandTotal = subtotal + scAmount + vatAmount;
+      }
 
-    return { subtotal, scAmount, scRate, vatAmount, grandTotal };
-  };
+      return { subtotal, scAmount, scRate, vatAmount, grandTotal };
+    },
+    [settings.enableServiceCharge, settings.enableVat, settings.isVatInclusive, settings.serviceChargeRate, settings.vatRate]
+  );
 
   // Order Operations
   const addItemToOrder = (
