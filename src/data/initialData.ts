@@ -15,6 +15,9 @@ import type {
   ApiKey,
   WebhookEndpoint,
   AccountingIntegrationConfig,
+  AutomationWorkflow,
+  WorkflowSchedule,
+  KnowledgeDocument,
 } from '../types/pos';
 
 export const initialSettings: RestaurantSettings = {

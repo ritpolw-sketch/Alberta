@@ -250,6 +250,83 @@ export interface LineMessageLog {
   ocrStatus?: 'success' | 'discrepancy' | 'verified';
 }
 
+// -------------------------------------------------------------
+// Automation Workflow, RBAC Scheduling & Knowledge Management (KM)
+// -------------------------------------------------------------
+export type WorkflowCategory = 'procurement' | 'operations' | 'inventory' | 'finance' | 'customer' | 'custom';
+export type WorkflowTriggerType = 'event' | 'schedule' | 'threshold' | 'manual';
+
+export interface WorkflowActionStep {
+  id: string;
+  type: 'line_notify' | 'create_po' | 'sync_accounting' | 'kds_alert' | 'email_report' | 'print_ticket' | 'webhook_call';
+  title: string;
+  description: string;
+  targetChannel?: string;
+}
+
+export interface AutomationWorkflow {
+  id: string;
+  nameTh: string;
+  nameEn: string;
+  category: WorkflowCategory;
+  descriptionTh: string;
+  descriptionEn: string;
+  icon: string;
+  enabled: boolean;
+  triggerType: WorkflowTriggerType;
+  triggerCondition: string;
+  actions: WorkflowActionStep[];
+  allowedRoles: StaffRole[];
+  approverRole?: StaffRole;
+  scheduleCron?: string;
+  scheduleHuman?: string;
+  linkedSopId?: string;
+  lastRunAt?: string;
+  lastRunStatus?: 'success' | 'warning' | 'failed' | 'pending_approval';
+  executionCount: number;
+  isSpecialProcurement?: boolean;
+}
+
+export interface WorkflowSchedule {
+  id: string;
+  workflowId: string;
+  title: string;
+  timeOfDay: string; // e.g. "07:00", "22:30"
+  daysOfWeek: number[]; // [0,1,2,3,4,5,6] (0 = Sun, 1 = Mon...)
+  cronExpression: string;
+  enabled: boolean;
+  targetAction: string;
+  allowedRoles: StaffRole[];
+  requireApproval: boolean;
+  approverRole: StaffRole;
+  lastRun?: string;
+  nextRun?: string;
+  status: 'active' | 'paused' | 'running';
+}
+
+export type KnowledgeCategory = 'procurement' | 'kitchen_sop' | 'cash_handling' | 'service_sop' | 'emergency' | 'ai_prompts';
+
+export interface KnowledgeChecklistItem {
+  id: string;
+  text: string;
+  required: boolean;
+}
+
+export interface KnowledgeDocument {
+  id: string;
+  titleTh: string;
+  titleEn: string;
+  category: KnowledgeCategory;
+  summary: string;
+  contentMarkdown: string;
+  tags: string[];
+  authorRole: StaffRole;
+  updatedAt: string;
+  version: string;
+  linkedWorkflowIds: string[];
+  checklists?: KnowledgeChecklistItem[];
+}
+
 export type ApiKeyPermission = 'read_sales' | 'read_bills' | 'read_write_pos' | 'read_inventory' | 'export_vat_tax' | 'accounting_sync';
 
 export interface ApiKey {
