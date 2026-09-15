@@ -26,6 +26,8 @@ import {
   Key,
   Printer,
   Workflow,
+  Calculator,
+  Scale,
 } from 'lucide-react';
 import type { MenuItem, AdminSubTab, RestaurantSettings, CardGatewayType, SinglePrintLayoutConfig } from '../../types/pos';
 import { initialSettings } from '../../data/initialData';
@@ -35,9 +37,13 @@ import { EmployeePanel } from './EmployeePanel';
 import { ShiftManagePage } from './ShiftManagePage';
 import { ProcurementPanel } from './ProcurementPanel';
 import { AccountingApiPanel } from './AccountingApiPanel';
+import { CogsFoundationPanel } from './CogsFoundationPanel';
+import { RawMaterialCostPanel } from './RawMaterialCostPanel';
 
 const sidebarTabs: { id: AdminSubTab; icon: React.ReactNode; labelTh: string; labelEn: string; ownerOnly?: boolean }[] = [
   { id: 'dashboard', icon: <TrendingUp size={16} />, labelTh: 'ภาพรวม & ยอดขาย', labelEn: 'Dashboard', ownerOnly: true },
+  { id: 'raw_material_cost', icon: <Scale size={16} />, labelTh: '🥩 ต้นทุนวัตถุดิบ (Raw Material)', labelEn: 'Raw Material Cost', ownerOnly: true },
+  { id: 'cogs_foundation', icon: <Calculator size={16} />, labelTh: 'ต้นทุน CoGS & ตั้งค่ารากฐาน', labelEn: 'CoGS & Foundation', ownerOnly: true },
   { id: 'procurement', icon: <Workflow size={16} />, labelTh: 'เวิร์กโฟลว์ & จัดซื้อ (Automation)', labelEn: 'Automation Workflows', ownerOnly: true },
   { id: 'api_keys', icon: <Key size={16} />, labelTh: 'API Key & โปรแกรมบัญชี', labelEn: 'API Keys & Accounting', ownerOnly: true },
   { id: 'shifts', icon: <Clock size={16} />, labelTh: 'จัดการกะ', labelEn: 'Manage Shifts' },
@@ -69,7 +75,7 @@ export const AdminDashboard: React.FC = () => {
   // If staff is not owner/admin and is currently on an owner-only tab, switch to 'shifts'
   useEffect(() => {
     const isOwnerOrAdmin = currentStaff?.role === 'owner' || currentStaff?.role === 'admin';
-    const ownerTabs: AdminSubTab[] = ['dashboard', 'employees', 'settings', 'procurement', 'api_keys'];
+    const ownerTabs: AdminSubTab[] = ['dashboard', 'employees', 'settings', 'procurement', 'api_keys', 'cogs_foundation', 'raw_material_cost'];
     if (!isOwnerOrAdmin && ownerTabs.includes(adminSubTab)) {
       setAdminSubTab('shifts');
     }
@@ -481,14 +487,26 @@ export const AdminDashboard: React.FC = () => {
                 </p>
               </div>
 
-              <button
-                onClick={() => setIsAddingNew(true)}
-                className="btn-primary"
-                style={{ padding: '8px 16px', fontSize: 13 }}
-              >
-                <Plus size={16} />
-                <span>{language === 'th' ? '+ เพิ่มเมนูใหม่' : '+ Add New Dish'}</span>
-              </button>
+              <div style={{ display: 'flex', gap: 10 }}>
+                <button
+                  type="button"
+                  onClick={() => setAdminSubTab('cogs_foundation')}
+                  className="btn-secondary"
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 14px', fontSize: 13 }}
+                >
+                  <Calculator size={15} style={{ color: 'var(--color-primary)' }} />
+                  <span>{language === 'th' ? 'ต้นทุน CoGS & สูตร BOM' : 'CoGS & Recipe BOM'}</span>
+                </button>
+
+                <button
+                  onClick={() => setIsAddingNew(true)}
+                  className="btn-primary"
+                  style={{ padding: '8px 16px', fontSize: 13 }}
+                >
+                  <Plus size={16} />
+                  <span>{language === 'th' ? '+ เพิ่มเมนูใหม่' : '+ Add New Dish'}</span>
+                </button>
+              </div>
             </div>
 
             {/* Menu Items Table */}
@@ -2058,6 +2076,10 @@ export const AdminDashboard: React.FC = () => {
             </div>
           </div>
         )}
+
+        {activeTab === 'raw_material_cost' && <RawMaterialCostPanel />}
+
+        {activeTab === 'cogs_foundation' && <CogsFoundationPanel />}
 
         {activeTab === 'procurement' && <ProcurementPanel />}
 

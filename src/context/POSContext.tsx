@@ -27,6 +27,12 @@ import type {
   AutomationWorkflow,
   WorkflowSchedule,
   KnowledgeDocument,
+  MenuItemRecipe,
+  FoundationConfig,
+  RawMaterialCostItem,
+  PriceHistoryRecord,
+  SupplierPriceQuote,
+  YieldTestRecord,
 } from '../types/pos';
 import {
   initialCategories,
@@ -48,6 +54,9 @@ import {
   initialWorkflows,
   initialWorkflowSchedules,
   initialKnowledgeDocs,
+  initialFoundationConfig,
+  initialMenuRecipes,
+  initialRawMaterialCosts,
 } from '../data/initialData';
 
 interface POSContextType {
@@ -147,6 +156,18 @@ interface POSContextType {
   approveAndPayPO: (poId: string) => void;
   updateLineAgentConfig: (newConfig: Partial<LineAgentConfig>) => void;
   triggerAutoPOForLowStock: (itemId: string) => void;
+  deductInventoryFromOrder: (order: Order) => void;
+  simulateSaleAndDeductStock: (saleItems: { menuItemId: string; quantity: number }[]) => {
+    totalSales: number;
+    totalCogs: number;
+    deductedIngredients: { nameTh: string; amount: number; unit: string; currentStock: number }[];
+  };
+  createBulkPOForSupplier: (
+    supplierId: string,
+    items: { inventoryItemId: string; qtyOrdered: number; unitPrice?: number }[],
+    autoSendLine?: boolean
+  ) => PurchaseOrder;
+  triggerAllSupplierReorders: () => PurchaseOrder[];
 
   // API Keys & Accounting Program Connectors
   apiKeys: ApiKey[];
@@ -183,6 +204,22 @@ interface POSContextType {
   addKnowledgeDoc: (doc: Omit<KnowledgeDocument, 'id' | 'updatedAt'>) => void;
   updateKnowledgeDoc: (doc: KnowledgeDocument) => void;
   deleteKnowledgeDoc: (id: string) => void;
+
+  // Foundation Setup & CoGS Configuration
+  foundationConfig: FoundationConfig;
+  menuRecipes: Record<string, MenuItemRecipe>;
+  updateFoundationConfig: (newCfg: Partial<FoundationConfig>) => void;
+  updateMenuItemRecipe: (recipe: MenuItemRecipe) => void;
+  deleteMenuItemRecipe: (menuItemId: string) => void;
+
+  // Raw Material Cost & Market Price Tracking
+  rawMaterials: RawMaterialCostItem[];
+  updateRawMaterialCost: (id: string, updates: Partial<RawMaterialCostItem>, syncToBOM?: boolean) => void;
+  addRawMaterialPriceRecord: (rawMaterialId: string, record: Omit<PriceHistoryRecord, 'id'>) => void;
+  addSupplierQuote: (rawMaterialId: string, quote: SupplierPriceQuote) => void;
+  setPrimarySupplierQuote: (rawMaterialId: string, supplierId: string) => void;
+  addYieldTestRecord: (rawMaterialId: string, test: Omit<YieldTestRecord, 'id'>) => void;
+  resetRawMaterialsToDefault: () => void;
 }
 
 const POSContext = createContext<POSContextType | undefined>(undefined);
@@ -966,6 +1003,9 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       )
     );
 
+    // Deduct stock based on BOM / Recipe & trigger inventory updates
+    deductInventoryFromOrder(activeOrder);
+
     // Update shift metrics
     setCurrentShift((prev) => {
       const cashDelta = payment.method === 'cash' ? payment.amount : 0;
@@ -1391,6 +1431,219 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  // -------------------------------------------------------------
+  // BOM + COGS + Sale Stock Deduction Engine
+  // -------------------------------------------------------------
+  const deductInventoryFromOrder = (order: Order) => {
+    if (!order || !order.items || order.items.length === 0) return;
+
+    setInventory((prevInventory) => {
+      const updated = [...prevInventory];
+
+      order.items.forEach((orderItem) => {
+        const recipe = menuRecipes[orderItem.menuItemId];
+        if (recipe && recipe.ingredients && recipe.ingredients.length > 0) {
+          recipe.ingredients.forEach((ing) => {
+            const invIndex = updated.findIndex((i) => i.id === ing.inventoryItemId);
+            if (invIndex !== -1) {
+              const invItem = updated[invIndex];
+              const wasteFactor = 1 + (ing.wastagePercent || 0) / 100;
+              let normQty = ing.quantity * orderItem.quantity * wasteFactor;
+              if (ing.unit === 'g' && invItem.unit === 'kg') normQty = normQty / 1000;
+              if (ing.unit === 'ml' && invItem.unit === 'L') normQty = normQty / 1000;
+
+              const newStock = Math.max(0, Number((invItem.currentStock - normQty).toFixed(3)));
+              updated[invIndex] = {
+                ...invItem,
+                currentStock: newStock,
+              };
+            }
+          });
+        } else {
+          // Direct retail item check (e.g. bottles)
+          const invIndex = updated.findIndex(
+            (i) =>
+              i.nameTh.toLowerCase().includes(orderItem.nameTh.toLowerCase()) ||
+              orderItem.nameTh.toLowerCase().includes(i.nameTh.toLowerCase())
+          );
+          if (invIndex !== -1) {
+            const invItem = updated[invIndex];
+            const newStock = Math.max(0, Number((invItem.currentStock - orderItem.quantity).toFixed(3)));
+            updated[invIndex] = {
+              ...invItem,
+              currentStock: newStock,
+            };
+          }
+        }
+      });
+
+      return updated;
+    });
+  };
+
+  const simulateSaleAndDeductStock = (saleItems: { menuItemId: string; quantity: number }[]) => {
+    let totalSales = 0;
+    let totalCogs = 0;
+    const deductedMap: Record<string, { nameTh: string; amount: number; unit: string; currentStock: number }> = {};
+
+    setInventory((prevInventory) => {
+      const updated = [...prevInventory];
+
+      saleItems.forEach((sItem) => {
+        const menuItem = menuItems.find((m) => m.id === sItem.menuItemId);
+        if (menuItem) {
+          totalSales += menuItem.price * sItem.quantity;
+        }
+
+        const recipe = menuRecipes[sItem.menuItemId];
+        if (recipe && recipe.ingredients && recipe.ingredients.length > 0) {
+          recipe.ingredients.forEach((ing) => {
+            const invIndex = updated.findIndex((i) => i.id === ing.inventoryItemId);
+            if (invIndex !== -1) {
+              const invItem = updated[invIndex];
+              const wasteFactor = 1 + (ing.wastagePercent || 0) / 100;
+              let normQty = ing.quantity * sItem.quantity * wasteFactor;
+              if (ing.unit === 'g' && invItem.unit === 'kg') normQty = normQty / 1000;
+              if (ing.unit === 'ml' && invItem.unit === 'L') normQty = normQty / 1000;
+
+              const newStock = Math.max(0, Number((invItem.currentStock - normQty).toFixed(3)));
+              totalCogs += normQty * invItem.avgCost;
+
+              if (!deductedMap[invItem.id]) {
+                deductedMap[invItem.id] = {
+                  nameTh: invItem.nameTh,
+                  amount: normQty,
+                  unit: invItem.unit,
+                  currentStock: newStock,
+                };
+              } else {
+                deductedMap[invItem.id].amount += normQty;
+                deductedMap[invItem.id].currentStock = newStock;
+              }
+
+              updated[invIndex] = {
+                ...invItem,
+                currentStock: newStock,
+              };
+            }
+          });
+        } else if (menuItem) {
+          const invIndex = updated.findIndex(
+            (i) =>
+              i.nameTh.toLowerCase().includes(menuItem.nameTh.toLowerCase()) ||
+              menuItem.nameTh.toLowerCase().includes(i.nameTh.toLowerCase())
+          );
+          if (invIndex !== -1) {
+            const invItem = updated[invIndex];
+            const newStock = Math.max(0, Number((invItem.currentStock - sItem.quantity).toFixed(3)));
+            totalCogs += sItem.quantity * invItem.avgCost;
+
+            if (!deductedMap[invItem.id]) {
+              deductedMap[invItem.id] = {
+                nameTh: invItem.nameTh,
+                amount: sItem.quantity,
+                unit: invItem.unit,
+                currentStock: newStock,
+              };
+            } else {
+              deductedMap[invItem.id].amount += sItem.quantity;
+              deductedMap[invItem.id].currentStock = newStock;
+            }
+
+            updated[invIndex] = {
+              ...invItem,
+              currentStock: newStock,
+            };
+          }
+        }
+      });
+
+      return updated;
+    });
+
+    return {
+      totalSales,
+      totalCogs,
+      deductedIngredients: Object.values(deductedMap),
+    };
+  };
+
+  const createBulkPOForSupplier = (
+    supplierId: string,
+    items: { inventoryItemId: string; qtyOrdered: number; unitPrice?: number }[],
+    autoSendLine: boolean = true
+  ): PurchaseOrder => {
+    const supplier = suppliers.find((s) => s.id === supplierId) || suppliers[0];
+    const poItems: POItem[] = items.map((itm) => {
+      const inv = inventory.find((i) => i.id === itm.inventoryItemId);
+      const unitPrice = itm.unitPrice !== undefined ? itm.unitPrice : inv?.avgCost || 0;
+      return {
+        inventoryItemId: itm.inventoryItemId,
+        nameTh: inv?.nameTh || 'สินค้าสั่งซื้อ',
+        unit: inv?.unit || 'หน่วย',
+        qtyOrdered: itm.qtyOrdered,
+        unitPrice,
+        total: itm.qtyOrdered * unitPrice,
+      };
+    });
+
+    const subtotal = poItems.reduce((sum, i) => sum + i.total, 0);
+    const poCount = purchaseOrders.length + 1;
+    const poNum = `PO-202609-${String(poCount).padStart(3, '0')}`;
+
+    const newPo: PurchaseOrder = {
+      id: `po-${Date.now()}`,
+      poNumber: poNum,
+      supplierId: supplier.id,
+      supplierName: supplier.name,
+      status: 'draft',
+      items: poItems,
+      subtotal,
+      grandTotal: subtotal,
+      createdAt: new Date().toISOString(),
+      createdBy: currentStaff?.name || 'Owner / Procurement Auto',
+      paymentStatus: 'pending',
+      stockIngested: false,
+    };
+
+    setPurchaseOrders((prev) => [newPo, ...prev]);
+
+    if (autoSendLine) {
+      setTimeout(() => {
+        sendPOToLineGroup(newPo.id);
+      }, 300);
+    }
+
+    return newPo;
+  };
+
+  const triggerAllSupplierReorders = (): PurchaseOrder[] => {
+    // Find all inventory items where currentStock <= minSafetyThreshold
+    const lowStockItems = inventory.filter((inv) => inv.currentStock <= inv.minSafetyThreshold);
+    if (lowStockItems.length === 0) return [];
+
+    // Group by supplier
+    const supplierMap: Record<string, { inventoryItemId: string; qtyOrdered: number; unitPrice: number }[]> = {};
+    lowStockItems.forEach((item) => {
+      const sId = item.supplierId || suppliers[0]?.id || 'sup-1';
+      if (!supplierMap[sId]) supplierMap[sId] = [];
+      const qtyToOrder = Math.max(10, Math.ceil(item.minSafetyThreshold * 1.5 - item.currentStock));
+      supplierMap[sId].push({
+        inventoryItemId: item.id,
+        qtyOrdered: qtyToOrder,
+        unitPrice: item.avgCost,
+      });
+    });
+
+    const createdPOs: PurchaseOrder[] = [];
+    Object.entries(supplierMap).forEach(([supId, items]) => {
+      const po = createBulkPOForSupplier(supId, items, true);
+      createdPOs.push(po);
+    });
+
+    return createdPOs;
+  };
+
   // API Keys & Accounting Program Connectors state
   const [apiKeys, setApiKeys] = useState<ApiKey[]>(() => {
     const saved = localStorage.getItem(`${STORAGE_PREFIX}api_keys`);
@@ -1801,6 +2054,260 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setKnowledgeDocs((prev) => prev.filter((d) => d.id !== id));
   };
 
+  // -------------------------------------------------------------
+  // Foundation Setup & CoGS State & Methods
+  // -------------------------------------------------------------
+  const [foundationConfig, setFoundationConfig] = useState<FoundationConfig>(() => {
+    const saved = localStorage.getItem(`${STORAGE_PREFIX}foundation_config`);
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        return {
+          ...initialFoundationConfig,
+          ...parsed,
+          cogs: {
+            ...initialFoundationConfig.cogs,
+            ...(parsed.cogs || {}),
+          },
+        };
+      } catch (e) {
+        console.error('Failed to parse foundation config', e);
+      }
+    }
+    return initialFoundationConfig;
+  });
+
+  useEffect(() => {
+    localStorage.setItem(`${STORAGE_PREFIX}foundation_config`, JSON.stringify(foundationConfig));
+  }, [foundationConfig]);
+
+  const [menuRecipes, setMenuRecipes] = useState<Record<string, MenuItemRecipe>>(() => {
+    const saved = localStorage.getItem(`${STORAGE_PREFIX}menu_recipes`);
+    if (saved) {
+      try {
+        return { ...initialMenuRecipes, ...JSON.parse(saved) };
+      } catch (e) {
+        console.error('Failed to parse menu recipes', e);
+      }
+    }
+    return initialMenuRecipes;
+  });
+
+  useEffect(() => {
+    localStorage.setItem(`${STORAGE_PREFIX}menu_recipes`, JSON.stringify(menuRecipes));
+  }, [menuRecipes]);
+
+  const updateFoundationConfig = (newCfg: Partial<FoundationConfig>) => {
+    setFoundationConfig((prev) => ({
+      ...prev,
+      ...newCfg,
+      cogs: {
+        ...prev.cogs,
+        ...(newCfg.cogs || {}),
+      },
+    }));
+  };
+
+  const updateMenuItemRecipe = (recipe: MenuItemRecipe) => {
+    setMenuRecipes((prev) => ({
+      ...prev,
+      [recipe.menuItemId]: {
+        ...recipe,
+        updatedAt: new Date().toISOString().replace('T', ' ').slice(0, 16),
+      },
+    }));
+  };
+
+  const deleteMenuItemRecipe = (menuItemId: string) => {
+    setMenuRecipes((prev) => {
+      const copy = { ...prev };
+      delete copy[menuItemId];
+      return copy;
+    });
+  };
+
+  const [rawMaterials, setRawMaterials] = useState<RawMaterialCostItem[]>(() => {
+    const saved = localStorage.getItem(`${STORAGE_PREFIX}raw_materials`);
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed;
+        }
+      } catch (e) {
+        console.error('Failed to parse raw materials', e);
+      }
+    }
+    return initialRawMaterialCosts;
+  });
+
+  useEffect(() => {
+    localStorage.setItem(`${STORAGE_PREFIX}raw_materials`, JSON.stringify(rawMaterials));
+  }, [rawMaterials]);
+
+  const updateRawMaterialCost = (id: string, updates: Partial<RawMaterialCostItem>, syncToBOM = true) => {
+    setRawMaterials((prev) => {
+      return prev.map((rm) => {
+        if (rm.id !== id) return rm;
+
+        const newAsPurchased = updates.asPurchasedCost !== undefined ? updates.asPurchasedCost : rm.asPurchasedCost;
+        const newFreight = updates.freightAndHandlingCostPerUnit !== undefined ? updates.freightAndHandlingCostPerUnit : rm.freightAndHandlingCostPerUnit;
+        const newLanded = updates.landedCost !== undefined ? updates.landedCost : newAsPurchased + newFreight;
+        const newTrimmingWaste = updates.trimmingWastePct !== undefined ? updates.trimmingWastePct : rm.trimmingWastePct;
+        const newCookingYield = updates.cookingYieldPct !== undefined ? updates.cookingYieldPct : rm.cookingYieldPct;
+
+        // Calculate usable edible portion cost: Landed / (1 - waste) / (yield / 100)
+        const wasteFactor = Math.max(0.01, 1 - (newTrimmingWaste / 100));
+        const yieldFactor = Math.max(0.01, newCookingYield / 100);
+        const newUsableCost = Math.round((newLanded / wasteFactor / yieldFactor) * 100) / 100;
+
+        // Price trend status
+        let newPriceStatus = rm.priceStatus;
+        let newMoM = rm.priceChangePctMoM;
+        if (rm.lastMonthAvgPrice > 0 && updates.asPurchasedCost !== undefined) {
+          newMoM = Math.round(((newAsPurchased - rm.lastMonthAvgPrice) / rm.lastMonthAvgPrice) * 10000) / 100;
+          if (newMoM > 10) newPriceStatus = 'volatile';
+          else if (newMoM > 0) newPriceStatus = 'increased';
+          else if (newMoM < 0) newPriceStatus = 'decreased';
+          else newPriceStatus = 'stable';
+        }
+
+        // History entry if price changed
+        let newHistory = rm.history;
+        if (updates.asPurchasedCost !== undefined && updates.asPurchasedCost !== rm.asPurchasedCost) {
+          newHistory = [
+            ...rm.history,
+            {
+              id: `h-${Date.now()}`,
+              date: new Date().toISOString().slice(0, 10),
+              price: newAsPurchased,
+              source: 'manual_override',
+              supplierName: rm.primarySupplierName,
+              note: 'ปรับปรุงต้นทุนราคาซื้อใหม่',
+            },
+          ];
+        }
+
+        const updatedRM: RawMaterialCostItem = {
+          ...rm,
+          ...updates,
+          asPurchasedCost: newAsPurchased,
+          freightAndHandlingCostPerUnit: newFreight,
+          landedCost: newLanded,
+          trimmingWastePct: newTrimmingWaste,
+          cookingYieldPct: newCookingYield,
+          usableEdiblePortionCost: newUsableCost,
+          priceChangePctMoM: newMoM,
+          priceStatus: newPriceStatus,
+          history: newHistory,
+          updatedAt: new Date().toISOString().replace('T', ' ').slice(0, 16),
+        };
+
+        // Sync to inventory avgCost if linked
+        if (syncToBOM && rm.inventoryItemId) {
+          setInventory((prevInv) =>
+            prevInv.map((inv) => (inv.id === rm.inventoryItemId ? { ...inv, avgCost: newAsPurchased } : inv))
+          );
+
+          // Update BOM Recipe snapshots
+          setMenuRecipes((prevRecipes) => {
+            const nextRecipes: Record<string, MenuItemRecipe> = {};
+            for (const [menuId, recipe] of Object.entries(prevRecipes)) {
+              const updatedIngredients = recipe.ingredients.map((ing) => {
+                if (ing.inventoryItemId === rm.inventoryItemId) {
+                  return { ...ing, unitCostSnapshot: newAsPurchased };
+                }
+                return ing;
+              });
+              nextRecipes[menuId] = { ...recipe, ingredients: updatedIngredients };
+            }
+            return nextRecipes;
+          });
+        }
+
+        return updatedRM;
+      });
+    });
+  };
+
+  const addRawMaterialPriceRecord = (rawMaterialId: string, record: Omit<PriceHistoryRecord, 'id'>) => {
+    setRawMaterials((prev) =>
+      prev.map((rm) => {
+        if (rm.id !== rawMaterialId) return rm;
+        const newRec: PriceHistoryRecord = { ...record, id: `h-${Date.now()}` };
+        return {
+          ...rm,
+          history: [...rm.history, newRec],
+          asPurchasedCost: record.price,
+          updatedAt: new Date().toISOString().replace('T', ' ').slice(0, 16),
+        };
+      })
+    );
+  };
+
+  const addSupplierQuote = (rawMaterialId: string, quote: SupplierPriceQuote) => {
+    setRawMaterials((prev) =>
+      prev.map((rm) => {
+        if (rm.id !== rawMaterialId) return rm;
+        const existingIdx = rm.quotes.findIndex((q) => q.supplierId === quote.supplierId);
+        let updatedQuotes = [...rm.quotes];
+        if (existingIdx >= 0) {
+          updatedQuotes[existingIdx] = quote;
+        } else {
+          updatedQuotes.push(quote);
+        }
+        return {
+          ...rm,
+          quotes: updatedQuotes,
+          updatedAt: new Date().toISOString().replace('T', ' ').slice(0, 16),
+        };
+      })
+    );
+  };
+
+  const setPrimarySupplierQuote = (rawMaterialId: string, supplierId: string) => {
+    setRawMaterials((prev) =>
+      prev.map((rm) => {
+        if (rm.id !== rawMaterialId) return rm;
+        const targetQuote = rm.quotes.find((q) => q.supplierId === supplierId);
+        if (!targetQuote) return rm;
+        const updatedQuotes = rm.quotes.map((q) => ({
+          ...q,
+          isPrimary: q.supplierId === supplierId,
+        }));
+        return {
+          ...rm,
+          primarySupplierId: supplierId,
+          primarySupplierName: targetQuote.supplierName,
+          asPurchasedCost: targetQuote.quotedPrice,
+          quotes: updatedQuotes,
+          updatedAt: new Date().toISOString().replace('T', ' ').slice(0, 16),
+        };
+      })
+    );
+  };
+
+  const addYieldTestRecord = (rawMaterialId: string, test: Omit<YieldTestRecord, 'id'>) => {
+    setRawMaterials((prev) =>
+      prev.map((rm) => {
+        if (rm.id !== rawMaterialId) return rm;
+        const newTest: YieldTestRecord = { ...test, id: `yt-${Date.now()}` };
+        return {
+          ...rm,
+          trimmingWastePct: test.trimmingLossPct,
+          cookingYieldPct: test.cookingShrinkagePct ? Math.max(1, 100 - test.cookingShrinkagePct) : rm.cookingYieldPct,
+          yieldTests: [newTest, ...rm.yieldTests],
+          updatedAt: new Date().toISOString().replace('T', ' ').slice(0, 16),
+        };
+      })
+    );
+  };
+
+  const resetRawMaterialsToDefault = () => {
+    setRawMaterials(initialRawMaterialCosts);
+    localStorage.removeItem(`${STORAGE_PREFIX}raw_materials`);
+  };
+
   return (
     <POSContext.Provider
       value={{
@@ -1880,6 +2387,10 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         approveAndPayPO,
         updateLineAgentConfig,
         triggerAutoPOForLowStock,
+        deductInventoryFromOrder,
+        simulateSaleAndDeductStock,
+        createBulkPOForSupplier,
+        triggerAllSupplierReorders,
         apiKeys,
         webhooks,
         accountingConfig,
@@ -1910,6 +2421,18 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         addKnowledgeDoc,
         updateKnowledgeDoc,
         deleteKnowledgeDoc,
+        foundationConfig,
+        menuRecipes,
+        updateFoundationConfig,
+        updateMenuItemRecipe,
+        deleteMenuItemRecipe,
+        rawMaterials,
+        updateRawMaterialCost,
+        addRawMaterialPriceRecord,
+        addSupplierQuote,
+        setPrimarySupplierQuote,
+        addYieldTestRecord,
+        resetRawMaterialsToDefault,
       }}
     >
       {children}

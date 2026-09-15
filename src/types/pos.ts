@@ -155,7 +155,7 @@ export interface CashTransaction {
 
 export type StaffRole = 'admin' | 'manager' | 'cashier' | 'owner' | 'kitchen';
 
-export type AdminSubTab = 'dashboard' | 'bills' | 'menu' | 'financing' | 'shifts' | 'employees' | 'settings' | 'procurement' | 'api_keys';
+export type AdminSubTab = 'dashboard' | 'bills' | 'menu' | 'financing' | 'shifts' | 'employees' | 'settings' | 'procurement' | 'api_keys' | 'cogs_foundation' | 'raw_material_cost';
 
 export type OrderingChannelMethod = 'line_group' | 'line_oa' | 'phone' | 'email_pdf';
 export type SupplierPaymentTerm = 'promptpay_cod' | 'credit_7' | 'credit_15' | 'credit_30' | 'cash_drawer';
@@ -255,10 +255,20 @@ export interface LineMessageLog {
 // -------------------------------------------------------------
 export type WorkflowCategory = 'procurement' | 'operations' | 'inventory' | 'finance' | 'customer' | 'custom';
 export type WorkflowTriggerType = 'event' | 'schedule' | 'threshold' | 'manual';
+export type ConditionOperator = 'less_than' | 'greater_than' | 'equals' | 'greater_or_equal' | 'less_or_equal' | 'contains' | 'not_equals';
+
+export interface WorkflowCondition {
+  id: string;
+  field: 'stock_level' | 'cash_discrepancy' | 'bill_amount' | 'time_of_day' | 'payment_method' | 'supplier_category' | 'custom';
+  fieldLabelTh: string;
+  operator: ConditionOperator;
+  value: string;
+  description: string;
+}
 
 export interface WorkflowActionStep {
   id: string;
-  type: 'line_notify' | 'create_po' | 'sync_accounting' | 'kds_alert' | 'email_report' | 'print_ticket' | 'webhook_call';
+  type: 'line_notify' | 'create_po' | 'sync_accounting' | 'kds_alert' | 'email_report' | 'print_ticket' | 'webhook_call' | 'ocr_verify';
   title: string;
   description: string;
   targetChannel?: string;
@@ -275,6 +285,8 @@ export interface AutomationWorkflow {
   enabled: boolean;
   triggerType: WorkflowTriggerType;
   triggerCondition: string;
+  triggerLabel?: string;
+  conditions?: WorkflowCondition[];
   actions: WorkflowActionStep[];
   allowedRoles: StaffRole[];
   approverRole?: StaffRole;
@@ -464,5 +476,159 @@ export interface QueuedCustomerOrder {
   status: 'queued' | 'processing' | 'completed' | 'failed';
   processedAt?: string;
   error?: string;
+}
+
+// -------------------------------------------------------------
+// CoGS (Cost of Goods Sold), Recipe BOM & Foundation Setup
+// -------------------------------------------------------------
+export type RecipeUnit = 'kg' | 'g' | 'L' | 'ml' | 'pcs' | 'pack' | 'portion';
+
+export interface RecipeIngredient {
+  id: string;
+  inventoryItemId: string; // Links to InventoryItem
+  nameTh: string;
+  quantity: number; // e.g. 0.150 kg or 150 g
+  unit: RecipeUnit;
+  wastagePercent?: number; // Shrinkage / cooking loss % e.g. 5%
+  unitCostSnapshot?: number; // Snapshot of avgCost per inventory unit
+}
+
+export interface MenuItemRecipe {
+  menuItemId: string;
+  menuItemNameTh: string;
+  sellingPrice: number;
+  ingredients: RecipeIngredient[];
+  prepCostLabor?: number; // Direct labor allocation per dish (฿)
+  packagingCost?: number; // Container / cup / paper bowl cost (฿)
+  overheadAllocation?: number; // Utilities / gas allocation per dish (฿)
+  targetFoodCostPercent?: number; // Target % e.g. 32%
+  notes?: string;
+  updatedAt?: string;
+}
+
+export interface CogsBenchmarkConfig {
+  targetFoodCostPercent: number; // Target Food Cost % (e.g. 32%)
+  targetBeverageCostPercent: number; // Target Beverage Cost % (e.g. 18%)
+  targetGrossMarginPercent: number; // Target Gross Margin % (e.g. 68%)
+  defaultWastageBufferPercent: number; // Prep shrinkage buffer % (e.g. 4%)
+  autoDeductStockOnOrder: boolean; // Decrement recipe ingredients when order is paid
+  laborRatePerHour: number; // Average hourly labor rate (e.g. ฿65/hr)
+  laborCostPerDishEstimate: number; // Direct labor allocation per dish (e.g. ฿10)
+  overheadCostPerDishEstimate: number; // Gas, electricity, rent allocation (e.g. ฿6)
+}
+
+export type StoreType = 'dine_in_restaurant' | 'cafe_beverage' | 'quick_service' | 'buffet' | 'bar_bistro';
+
+export interface FoundationConfig {
+  // Store & Organization Foundation
+  storeType: StoreType;
+  headOfficeOrBranch: 'head_office' | 'branch';
+  branchCode: string; // "00001" or "00000"
+  vatRegistrationNumber: string; // ภ.พ.20 number
+  registeredCompanyName: string; // บริษัท ตุ๋นมัน พระราม 3 จำกัด (สำนักงานใหญ่)
+  businessHoursStart: string; // "09:00"
+  businessHoursEnd: string; // "21:30"
+  currencySymbol: string; // "฿"
+  currencyCode: string; // "THB"
+
+  // Operations & Table Foundation
+  defaultGuestCapacity: number; // 4
+  tableTurnoverTargetMinutes: number; // 60
+  autoReleaseTableOnPaid: boolean; // true
+  allowSplitBill: boolean; // true
+  allowCombineTable: boolean; // true
+  dineInServiceChargeEnabled: boolean; // false
+  takeawayServiceChargeEnabled: boolean; // false
+
+  // Cash & Security Foundation
+  defaultOpeningFloat: number; // ฿2,000
+  maxCashDrawerLimit: number; // ฿15,000 (alert to drop into safe)
+  cashDiscrepancyWarningThreshold: number; // ฿50
+  requireManagerPinOnVoid: boolean; // true
+  requireManagerPinOnDiscount: boolean; // true
+
+  // Fiscal & Accounting Foundation
+  fiscalYearStartMonth: number; // 1 (January)
+  accountingSalesCode: string; // "4100 - รายได้จากการขายอาหารและเครื่องดื่ม"
+  accountingCogsCode: string; // "5100 - ต้นทุนขายและวัตถุดิบ (COGS)"
+  accountingInventoryCode: string; // "1150 - สินค้าและวัตถุดิบคงเหลือ"
+  accountingCashCode: string; // "1110 - เงินสดและเงินสดย่อยในลิ้นชัก"
+
+  // Costing & CoGS
+  cogs: CogsBenchmarkConfig;
+}
+
+// -------------------------------------------------------------
+// Raw Material Cost Management & Market Price Tracking
+// -------------------------------------------------------------
+export interface PriceHistoryRecord {
+  id: string;
+  date: string;
+  price: number;
+  source: 'invoice' | 'market_survey' | 'supplier_quote' | 'manual_override';
+  supplierName?: string;
+  note?: string;
+}
+
+export interface SupplierPriceQuote {
+  supplierId: string;
+  supplierName: string;
+  quotedPrice: number;
+  moq: number; // Minimum Order Quantity
+  unit: string;
+  leadTimeDays: number;
+  paymentTerm: string;
+  isPrimary: boolean;
+  lastUpdated: string;
+}
+
+export interface YieldTestRecord {
+  id: string;
+  testDate: string;
+  asPurchasedWeightKg: number; // AP (น้ำหนักซื้อ)
+  ediblePortionWeightKg: number; // EP (น้ำหนักเนื้อที่ใช้ได้จริงหลังตัดแต่ง)
+  trimmingLossPct: number; // % เศษทิ้ง/ไขมัน
+  cookedWeightKg?: number; // น้ำหนักหลังต้มสุก
+  cookingShrinkagePct?: number; // % การหดตัวจากการต้ม
+  testedBy: string;
+}
+
+export interface RawMaterialCostItem {
+  id: string;
+  inventoryItemId: string; // Links to InventoryItem
+  sku: string;
+  nameTh: string;
+  nameEn: string;
+  category: string;
+  unit: string;
+  
+  // Costs & Landed Calculations
+  asPurchasedCost: number; // AP Cost (ราคาซื้อต่อหน่วย)
+  freightAndHandlingCostPerUnit: number; // ค่าขนส่ง/ค่าจัดการต่อหน่วย (฿)
+  landedCost: number; // AP Cost + Freight/Handling
+  
+  // Yield & Usable Net Cost
+  trimmingWastePct: number; // % เศษตัดแต่งทิ้ง (e.g. 5%)
+  cookingYieldPct: number; // % ผลผลิตหลังปรุงสุก (e.g. 70% if 30% shrinkage)
+  usableEdiblePortionCost: number; // Landed Cost / (1 - Waste%) = ต้นทุนต่อหน่วยใช้งานจริง
+  
+  // Market & Trend
+  marketBenchmarkPrice?: number; // ราคาตลาดกลาง (เช่น ตลาดไท/แม็คโคร)
+  lastMonthAvgPrice: number;
+  priceChangePctMoM: number; // % เปลี่ยนแปลงเทียบเดือนก่อน
+  priceStatus: 'stable' | 'increased' | 'decreased' | 'volatile';
+  
+  // Suppliers & Purchasing
+  primarySupplierId: string;
+  primarySupplierName: string;
+  quotes: SupplierPriceQuote[];
+  
+  // Tracking & BOM connection
+  usedInRecipeCount: number;
+  usedInRecipes: { menuItemId: string; menuItemNameTh: string; portionQty: number; portionCost: number }[];
+  history: PriceHistoryRecord[];
+  yieldTests: YieldTestRecord[];
+  
+  updatedAt: string;
 }
 

@@ -21,6 +21,8 @@ import {
   Users,
   Settings as SettingsIcon,
   LogOut,
+  Scale,
+  Calculator,
 } from 'lucide-react';
 
 // Code-split secondary views to prioritize POS Master resources first
@@ -109,7 +111,11 @@ const POSContent: React.FC = () => {
     kds: { icon: <Flame size={15} />, th: 'จอครัว (KDS)', en: 'Kitchen KDS' },
     admin: {
       icon:
-        adminSubTab === 'procurement' ? (
+        adminSubTab === 'raw_material_cost' ? (
+          <Scale size={15} />
+        ) : adminSubTab === 'cogs_foundation' ? (
+          <Calculator size={15} />
+        ) : adminSubTab === 'procurement' ? (
           <Bot size={15} />
         ) : adminSubTab === 'api_keys' ? (
           <Key size={15} />
@@ -125,7 +131,11 @@ const POSContent: React.FC = () => {
           <BarChart3 size={15} />
         ),
       th:
-        adminSubTab === 'procurement'
+        adminSubTab === 'raw_material_cost'
+          ? 'ต้นทุนวัตถุดิบ (Raw Material Cost)'
+          : adminSubTab === 'cogs_foundation'
+          ? 'ต้นทุน CoGS & ตั้งค่ารากฐาน'
+          : adminSubTab === 'procurement'
           ? 'จัดซื้อ & LINE Agent'
           : adminSubTab === 'api_keys'
           ? 'API Key & โปรแกรมบัญชี'
@@ -139,7 +149,11 @@ const POSContent: React.FC = () => {
           ? 'ประวัติบิล (Bill Logs)'
           : 'เจ้าของร้าน (Admin)',
       en:
-        adminSubTab === 'procurement'
+        adminSubTab === 'raw_material_cost'
+          ? 'Raw Material Cost'
+          : adminSubTab === 'cogs_foundation'
+          ? 'CoGS & Foundation'
+          : adminSubTab === 'procurement'
           ? 'Procurement Agent'
           : adminSubTab === 'api_keys'
           ? 'API Keys & Accounting'
@@ -305,6 +319,30 @@ const POSContent: React.FC = () => {
                     <div style={{ padding: '4px 8px 2px', fontSize: 10, fontWeight: 800, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                       การจัดการระบบ (System Management)
                     </div>
+
+                    {/* 0. Raw Material Cost */}
+                    <button
+                      onClick={() => {
+                        setAdminSubTab('raw_material_cost');
+                        handleTabClick('admin');
+                      }}
+                      className={`nav-item ${activeTab === 'admin' && adminSubTab === 'raw_material_cost' ? 'active' : ''}`}
+                    >
+                      <Scale size={16} style={{ color: '#f87171' }} />
+                      <span>🥩 ต้นทุนวัตถุดิบ (Raw Material Cost)</span>
+                    </button>
+
+                    {/* 0.1 CoGS & Foundation */}
+                    <button
+                      onClick={() => {
+                        setAdminSubTab('cogs_foundation');
+                        handleTabClick('admin');
+                      }}
+                      className={`nav-item ${activeTab === 'admin' && adminSubTab === 'cogs_foundation' ? 'active' : ''}`}
+                    >
+                      <Calculator size={16} style={{ color: '#fbbf24' }} />
+                      <span>ต้นทุน CoGS & ตั้งค่ารากฐาน</span>
+                    </button>
 
                     {/* 1. API Key & Accounting */}
                     <button
